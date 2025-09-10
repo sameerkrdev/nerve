@@ -2,14 +2,16 @@
   "name": "api",
   "version": "1.0.0",
   "description": "",
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.ts"
+    "dev": "nodemon src/server.ts",
+    "build":"tsc"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",
@@ -17,8 +19,9 @@
     "nodemon": "^3.1.10"
   },
   "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
     "@types/express": "^5.0.3",
-    "@types/node": "^24.3.1",
+    "@types/node": "^22.15.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }

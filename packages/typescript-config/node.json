@@ -1,0 +1,15 @@
+{
+  "extends": "./base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ESNext",
+    "types": ["node"],
+    "sourceMap": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": false,
+    "noUncheckedSideEffectImports": true,
+    "allowImportingTsExtensions": false
+  },
+  "exclude": ["node_modules", "dist"]
+}
