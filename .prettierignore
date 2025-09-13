@@ -5,6 +5,9 @@ public
 **/**/.next
 **/**/public
 
+dist
+**/**/dist
+
 *.lock
 *.log
 

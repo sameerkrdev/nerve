@@ -2,12 +2,14 @@
   "name": "api",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/server.ts",
   "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.ts",
-    "build":"tsc"
+    "dev": "nodemon",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier ."
   },
   "keywords": [],
   "author": "",
@@ -23,6 +25,7 @@
     "@types/express": "^5.0.3",
     "@types/node": "^22.15.3",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.2"
   }
 }

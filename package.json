@@ -5,10 +5,15 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "lint:fix": "turbo run lint -- --fix",
+    "format": "turbo run format -- --write",
+    "format:check": "turbo run format -- --check",
+    "check-types": "turbo run check-types",
+    "prepare": "husky install"
   },
   "devDependencies": {
+    "husky": "^8.0.0",
+    "lint-staged": "^16.1.6",
     "prettier": "^3.6.2",
     "turbo": "^2.5.6",
     "typescript": "5.9.2"
@@ -16,5 +21,18 @@
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=18"
+  },
+  "lint-staged": {
+    "apps/**/*.{js,jsx,ts,tsx}": [
+      "turbo run lint --filter='./apps/*' --",
+      "prettier --write"
+    ],
+    "packages/**/*.{js,jsx,ts,tsx}": [
+      "turbo run lint --filter='./packages/*' --",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
   }
 }
