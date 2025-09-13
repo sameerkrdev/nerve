@@ -5,7 +5,7 @@
   "main": "src/server.ts",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "turbo build --filter=@repo/logger && nodemon",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
     "lint": "eslint . --ext .ts,.tsx",
@@ -18,10 +18,12 @@
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",
     "express": "^5.1.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "@repo/logger": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@types/express": "^5.0.3",
     "@types/node": "^22.15.3",
     "ts-node": "^10.9.2",
