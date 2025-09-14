@@ -1,4 +1,3 @@
-// import { logger } from './../../../packages/logger/src/index';
 import express from "express";
 import env from "@/config/dotenv";
 import { logger } from "@repo/logger";

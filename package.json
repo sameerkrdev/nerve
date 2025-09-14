@@ -10,7 +10,8 @@
     "format": "turbo run format -- --write",
     "format:check": "turbo run format -- --check",
     "check-types": "turbo run check-types",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "lint-staged": "lint-staged"
   },
   "devDependencies": {
     "husky": "^8.0.0",
