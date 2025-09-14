@@ -22,7 +22,7 @@ export default [
       },
     },
     rules: {
-      "no-console": "off",
+      "no-console": "error",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/consistent-type-imports": "error",
     },
