@@ -15,7 +15,7 @@
     "infra:up": "cd infra/docker/clickhouse && docker compose up -d",
     "infra:down": "cd infra/docker/clickhouse && docker compose down",
     "infra:logs": "cd infra/docker/clickhouse && docker compose logs -f clickhouse",
-    "infra:reset": "cd infra/docker/clickhouse && docker compose down -v && docker-compose up -d",
+    "infra:reset": "cd infra/docker/clickhouse && docker compose down -v && docker compose up -d",
     "db:health": "curl -f http://localhost:8123/ping || exit 1"
   },
   "devDependencies": {
