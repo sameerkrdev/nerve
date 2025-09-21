@@ -5,12 +5,13 @@
   "main": "src/server.ts",
   "type": "commonjs",
   "scripts": {
-    "dev": "turbo build --filter=@repo/logger && nodemon",
+    "dev": "nodemon",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier .",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "keywords": [],
   "author": "",
@@ -20,7 +21,8 @@
     "envalid": "^8.1.0",
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
-    "@repo/logger": "workspace:*"
+    "@repo/logger": "workspace:*",
+    "@repo/database": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

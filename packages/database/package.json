@@ -1,14 +1,13 @@
 {
-  "name": "@repo/logger",
+  "name": "@repo/database",
   "version": "0.0.0",
+  "private": true,
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
@@ -17,14 +16,18 @@
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@repo/types": "workspace:*",
+    "@repo/logger": "workspace:*",
+    "@clickhouse/client": "^1.12.1"
+  },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "tsup": "^8.5.0",
+    "@types/node": "^22.15.3",
     "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^4.7.1"
   }
 }
