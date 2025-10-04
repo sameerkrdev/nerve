@@ -43,9 +43,7 @@ const startServer = async () => {
   } catch (error) {
     if (error instanceof Error) {
       logger.error(error.message);
-      setTimeout(() => {
-        process.exit(1);
-      }, 1000);
+      process.exit(1);
     }
   }
 };

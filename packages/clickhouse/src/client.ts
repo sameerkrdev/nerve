@@ -25,7 +25,7 @@ class ClickHouseManager {
 
     const { url, database, username, password } = config;
 
-    this.clickhouseClient = createClient({
+    const client = createClient({
       url,
       username,
       password,
@@ -36,7 +36,14 @@ class ClickHouseManager {
       keep_alive: { enabled: true, idle_socket_ttl: 2500 },
     });
 
-    await this.clickhouseClient.ping();
+    try {
+      await client.ping();
+      this.clickhouseClient = client;
+    } catch (error) {
+      await client.close();
+      throw new Error(`Failed to initialize ClickHouse client: ${error}`);
+    }
+
     return this.clickhouseClient;
   }
 

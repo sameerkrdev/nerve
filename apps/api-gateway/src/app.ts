@@ -16,7 +16,7 @@ app.get("/", (_, res) => {
 app.use((err: HttpError, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof Error) {
     logger.error(err.message);
-    const statusCode = err.status || err.status || 500;
+    const statusCode = err.status || err.statusCode || 500;
 
     res.status(statusCode).json({
       error: [

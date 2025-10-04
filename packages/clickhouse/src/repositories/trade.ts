@@ -11,7 +11,7 @@ export class TradeRepository {
     const tradeId = crypto.randomUUID();
 
     await this.client.insert({
-      table: "trade_data",
+      table: "nerve.trade_data",
       format: "JSONEachRow",
       values: [
         {
@@ -32,7 +32,7 @@ export class TradeRepository {
 
   async findById(id: string): Promise<Trade | null> {
     const resultSet = await this.client.query({
-      query: "SELECT * FROM trade_data WHERE id = {id:UUID} LIMIT 1",
+      query: "SELECT * FROM nerve.trade_data WHERE id = {id:UUID} LIMIT 1",
       query_params: { id },
       format: "JSONEachRow",
     });
