@@ -23,8 +23,11 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
-  apps/api:
+  apps/api-gateway:
     dependencies:
+      "@repo/clickhouse":
+        specifier: workspace:*
+        version: link:../../packages/clickhouse
       "@repo/logger":
         specifier: workspace:*
         version: link:../../packages/logger
@@ -37,22 +40,31 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
-      nodemon:
-        specifier: ^3.1.10
-        version: 3.1.10
+      http-errors:
+        specifier: ^2.0.0
+        version: 2.0.0
     devDependencies:
       "@repo/eslint-config":
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      "@repo/types":
+        specifier: workspace:*
+        version: link:../../packages/types
       "@repo/typescript-config":
         specifier: workspace:*
         version: link:../../packages/typescript-config
       "@types/express":
         specifier: ^5.0.3
         version: 5.0.3
+      "@types/http-errors":
+        specifier: ^2.0.5
+        version: 2.0.5
       "@types/node":
         specifier: ^22.15.3
         version: 22.15.3
+      nodemon:
+        specifier: ^3.1.10
+        version: 3.1.10
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@swc/core@1.13.5(@swc/helpers@0.5.15))(@types/node@22.15.3)(typescript@5.9.2)
@@ -118,6 +130,31 @@ importers:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.8.3)(vite@7.1.5(@types/node@22.15.3)(yaml@2.8.1))
 
+  packages/clickhouse:
+    dependencies:
+      "@clickhouse/client":
+        specifier: ^1.12.1
+        version: 1.12.1
+      "@repo/logger":
+        specifier: workspace:*
+        version: link:../logger
+      "@repo/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      "@repo/eslint-config":
+        specifier: workspace:*
+        version: link:../eslint-config
+      "@repo/typescript-config":
+        specifier: workspace:*
+        version: link:../typescript-config
+      "@types/node":
+        specifier: ^22.15.3
+        version: 22.15.3
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
   packages/eslint-config:
     devDependencies:
       "@eslint/js":
@@ -176,6 +213,21 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  packages/types:
+    devDependencies:
+      "@repo/eslint-config":
+        specifier: workspace:*
+        version: link:../eslint-config
+      "@repo/typescript-config":
+        specifier: workspace:*
+        version: link:../typescript-config
+      "@types/node":
+        specifier: ^22.15.3
+        version: 22.15.3
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
   packages/typescript-config: {}
 
   packages/ui:
@@ -210,6 +262,19 @@ importers:
         version: 5.9.2
 
 packages:
+  "@clickhouse/client-common@1.12.1":
+    resolution:
+      {
+        integrity: sha512-ccw1N6hB4+MyaAHIaWBwGZ6O2GgMlO99FlMj0B0UEGfjxM9v5dYVYql6FpP19rMwrVAroYs/IgX2vyZEBvzQLg==,
+      }
+
+  "@clickhouse/client@1.12.1":
+    resolution:
+      {
+        integrity: sha512-7ORY85rphRazqHzImNXMrh4vsaPrpetFoTWpZYueCO2bbO6PXYDXp/GQ4DgxnGIqbWB/Di1Ai+Xuwq2o7DJ36A==,
+      }
+    engines: { node: ">=16" }
+
   "@colors/colors@1.6.0":
     resolution:
       {
@@ -4214,6 +4279,12 @@ packages:
     engines: { node: ">=10" }
 
 snapshots:
+  "@clickhouse/client-common@1.12.1": {}
+
+  "@clickhouse/client@1.12.1":
+    dependencies:
+      "@clickhouse/client-common": 1.12.1
+
   "@colors/colors@1.6.0": {}
 
   "@cspotcode/source-map-support@0.8.1":

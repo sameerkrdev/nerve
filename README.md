@@ -1,135 +1,167 @@
-# Turborepo starter
+# Nerve Platform Startup Guide
 
-This Turborepo starter is maintained by the Turborepo core team.
+This document provides a step-by-step guide to start and run the Nerve exchange platform using Turborepo, Docker, Kafka, Redis, ClickHouse, and Postgres.
 
-## Using this example
+---
 
-Run the following command:
+## 1. Prerequisites
 
-```sh
-npx create-turbo@latest
+- Node.js >= 18
+- PNPM >= 9.0.0
+- Docker & Docker Compose
+- Turbo CLI (installed globally if needed)
+- (Optional) curl for health checks
+
+---
+
+## 2. Install Dependencies
+
+```bash
+# Install dependencies for all apps and packages
+pnpm install
+
+# Install Husky hooks
+pnpm prepare
 ```
 
-## What's inside?
+---
 
-This Turborepo includes the following packages/apps:
+## 3. Start Infrastructure
 
-### Apps and Packages
+Navigate to the infra folder and bring up all services.
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+```bash
+# Start all containers (Postgres, Redis, Kafka, Zookeeper, ClickHouse)
+pnpm run infra:up
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+# View logs
+pnpm run infra:logs
 
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+# To view logs for specific service
+pnpm run infra:logs:clickhouse
+pnpm run infra:logs:postgres
+pnpm run infra:logs:redis
+pnpm run infra:logs:kafka
+pnpm run infra:logs:zookeeper
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### Reset Infrastructure
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+```bash
+# Stops, removes volumes, and starts again
+pnpm run infra:reset
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+# Restart containers
+pnpm run infra:restart
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+# Check running containers
+pnpm run infra:ps
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+---
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+## 4. Check Database Health
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+Ensure all services are up and running.
 
-### Remote Caching
+```bash
+# Check ClickHouse
+pnpm run db:health:clickhouse
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+# Check Postgres
+pnpm run db:health:postgres
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+# Check Redis
+pnpm run db:health:redis
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+# Check Kafka
+pnpm run db:health:kafka
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+# Check all
+pnpm run db:health:all
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+---
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## 5. Connect to Databases
 
+```bash
+# ClickHouse
+pnpm run db:connect:clickhouse
+
+# Postgres
+pnpm run db:connect:postgres
+
+# Redis
+pnpm run db:connect:redis
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+---
+
+## 6. Manage Kafka Topics
+
+```bash
+# List topics
+pnpm run kafka:topics:list
+
+# Create a new topic
+pnpm run kafka:topics:create <topic_name>
+
+# Start a consumer
+pnpm run kafka:consumer <topic_name>
+
+# Start a producer
+pnpm run kafka:producer <topic_name>
 ```
 
-## Useful Links
+---
 
-Learn more about the power of Turborepo:
+## 7. Run Applications
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+### Start in Development Mode
+
+```bash
+# Start all apps in dev mode
+pnpm run dev
+```
+
+### Build Applications
+
+```bash
+# Build all apps and packages
+pnpm run build
+
+# Build logger package separately
+pnpm run build:logger
+```
+
+### Lint and Format Code
+
+```bash
+# Lint all apps and packages
+pnpm run lint
+pnpm run lint:fix
+
+# Format code
+pnpm run format
+pnpm run format:check
+```
+
+### Type Checking
+
+```bash
+pnpm run check-types
+```
+
+---
+
+## 8. Notes
+
+- Ensure `.env` files are set correctly in each app/package.
+- Follow the order flow documentation for API usage.
+- Kafka and Redis must be running before starting services.
+- Use WebSocket events for real-time updates.
+
+---
+
+**End of Startup Guide**

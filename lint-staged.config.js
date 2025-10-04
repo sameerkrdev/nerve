@@ -34,7 +34,8 @@ module.exports = {
       const match = filename.match(/(?:^|\/)packages\/([^/]+)\/(.+)/);
       if (!match) return acc;
 
-      if (match[1] == "eslint-config" || match[1] == "typescript-config") return acc;
+      if (match[1] == "eslint-config" || match[1] == "typescript-config" || match[1] === "types")
+        return acc;
 
       const pkgName = match[1];
       if (!acc[pkgName]) acc[pkgName] = [];
