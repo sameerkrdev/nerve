@@ -1,20 +1,16 @@
 -- ================================
 -- 1️⃣ CREATE DATABASE
 -- ================================
--- Create the database if it does not exist
 CREATE DATABASE IF NOT EXISTS nerve;
 
 
 -- ================================
 -- 2️⃣ RAW TRADE DATA TABLE
 -- ================================
--- Stores all raw trade events (tick-by-tick trades)
--- Partitioned by trade day for fast pruning
--- Ordered by (symbol, engine_timestamp) for efficient range queries
 CREATE TABLE IF NOT EXISTS nerve.trade_data (
     id UUID,
-    client_timestamp DateTime64(3), -- Time from client
-    engine_timestamp DateTime64(3), -- Time when trade was processed (use this for aggregation)
+    client_timestamp DateTime64(3),
+    engine_timestamp DateTime64(3),
     symbol LowCardinality(String),
     price Float64,
     volume Float64,
@@ -26,194 +22,245 @@ PARTITION BY toYYYYMMDD(engine_timestamp)
 ORDER BY (symbol, engine_timestamp)
 SETTINGS index_granularity = 8192;
 
--- Optional indexes for faster point/range lookups
 ALTER TABLE nerve.trade_data ADD INDEX IF NOT EXISTS idx_price  price   TYPE minmax GRANULARITY 4;
 ALTER TABLE nerve.trade_data ADD INDEX IF NOT EXISTS idx_userId user_id TYPE minmax GRANULARITY 4;
 ALTER TABLE nerve.trade_data ADD INDEX IF NOT EXISTS idx_id     id      TYPE minmax GRANULARITY 4;
 
 
 -- ================================
--- 3️⃣ CANDLE (OHLCV) TABLES
+-- 3️⃣ CANDLE STATE TABLES (Using AggregatingMergeTree)
 -- ================================
--- These tables store aggregated candles for different timeframes.
--- Using ReplacingMergeTree to allow updates if needed.
+-- These tables store intermediate aggregation states that can be merged
 
--- ---- 1-Minute Candles ----
-CREATE TABLE IF NOT EXISTS nerve.candles_1m (
+-- ---- 1-Minute Candles State ----
+CREATE TABLE IF NOT EXISTS nerve.candles_1m_state (
     symbol LowCardinality(String),
-    candle_time DateTime,          -- Start of the 1-minute interval
-    open Float64,
-    high Float64,
-    low Float64,
-    close Float64,
-    volume Float64,
-    trade_count UInt64,
-    volume_weighted_sum Float64,   -- sum(price * volume) - used to calculate VWAP
-    vwap Float64,                  -- Volume Weighted Average Price (calculated)
-    created_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(created_at)
+    candle_time DateTime,
+    open_state AggregateFunction(argMin, Float64, DateTime64(3)),
+    high_state AggregateFunction(max, Float64),
+    low_state AggregateFunction(min, Float64),
+    close_state AggregateFunction(argMax, Float64, DateTime64(3)),
+    volume_state AggregateFunction(sum, Float64),
+    trade_count_state AggregateFunction(count, UInt64),
+    volume_weighted_sum_state AggregateFunction(sum, Float64)
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(candle_time)
 ORDER BY (symbol, candle_time);
 
--- ---- 5-Minute Candles ----
-CREATE TABLE IF NOT EXISTS nerve.candles_5m (
+-- ---- 5-Minute Candles State ----
+CREATE TABLE IF NOT EXISTS nerve.candles_5m_state (
     symbol LowCardinality(String),
     candle_time DateTime,
-    open Float64,
-    high Float64,
-    low Float64,
-    close Float64,
-    volume Float64,
-    trade_count UInt64,
-    volume_weighted_sum Float64,   -- sum(price * volume) - used to calculate VWAP
-    vwap Float64,                  -- Volume Weighted Average Price (calculated)
-    created_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(created_at)
+    open_state AggregateFunction(argMin, Float64, DateTime64(3)),
+    high_state AggregateFunction(max, Float64),
+    low_state AggregateFunction(min, Float64),
+    close_state AggregateFunction(argMax, Float64, DateTime64(3)),
+    volume_state AggregateFunction(sum, Float64),
+    trade_count_state AggregateFunction(count, UInt64),
+    volume_weighted_sum_state AggregateFunction(sum, Float64)
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(candle_time)
 ORDER BY (symbol, candle_time);
 
--- ---- 4-Hour Candles ----
-CREATE TABLE IF NOT EXISTS nerve.candles_4h (
+-- ---- 4-Hour Candles State ----
+CREATE TABLE IF NOT EXISTS nerve.candles_4h_state (
     symbol LowCardinality(String),
     candle_time DateTime,
-    open Float64,
-    high Float64,
-    low Float64,
-    close Float64,
-    volume Float64,
-    trade_count UInt64,
-    volume_weighted_sum Float64,   -- sum(price * volume) - used to calculate VWAP
-    vwap Float64,                  -- Volume Weighted Average Price (calculated)
-    created_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(created_at)
+    open_state AggregateFunction(argMin, Float64, DateTime64(3)),
+    high_state AggregateFunction(max, Float64),
+    low_state AggregateFunction(min, Float64),
+    close_state AggregateFunction(argMax, Float64, DateTime64(3)),
+    volume_state AggregateFunction(sum, Float64),
+    trade_count_state AggregateFunction(count, UInt64),
+    volume_weighted_sum_state AggregateFunction(sum, Float64)
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMMDD(candle_time)
 ORDER BY (symbol, candle_time);
 
--- ---- Daily Candles ----
-CREATE TABLE IF NOT EXISTS nerve.candles_1d (
+-- ---- Daily Candles State ----
+CREATE TABLE IF NOT EXISTS nerve.candles_1d_state (
     symbol LowCardinality(String),
-    candle_date Date,               -- Start of the day
-    open Float64,
-    high Float64,
-    low Float64,
-    close Float64,
-    volume Float64,
-    trade_count UInt64,
-    volume_weighted_sum Float64,   -- sum(price * volume) - used to calculate VWAP
-    vwap Float64,                  -- Volume Weighted Average Price (calculated)
-    created_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(created_at)
+    candle_date Date,
+    open_state AggregateFunction(argMin, Float64, DateTime64(3)),
+    high_state AggregateFunction(max, Float64),
+    low_state AggregateFunction(min, Float64),
+    close_state AggregateFunction(argMax, Float64, DateTime64(3)),
+    volume_state AggregateFunction(sum, Float64),
+    trade_count_state AggregateFunction(count, UInt64),
+    volume_weighted_sum_state AggregateFunction(sum, Float64)
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(candle_date)
 ORDER BY (symbol, candle_date);
 
 
 -- ================================
--- 4️⃣ MATERIALIZED VIEWS
+-- 4️⃣ MATERIALIZED VIEWS (Writing to State Tables)
 -- ================================
--- These views automatically aggregate data from trade_data
--- and insert OHLCV candles into the respective tables.
 
--- ---- 1-Minute Candles ----
--- For real-time processing without delay for immediate feedback
-CREATE MATERIALIZED VIEW nerve.candles_1m_mv
-TO nerve.candles_1m AS
+-- ---- 1-Minute Candles MV ----
+CREATE MATERIALIZED VIEW IF NOT EXISTS nerve.candles_1m_mv
+TO nerve.candles_1m_state AS
 SELECT
     symbol,
     toStartOfMinute(engine_timestamp) AS candle_time,
-    argMin(price, engine_timestamp) AS open,
-    max(price) AS high,
-    min(price) AS low,
-    argMax(price, engine_timestamp) AS close,
-    sum(t.volume) AS volume,
-    count() AS trade_count,
-    sum(price * t.volume) AS volume_weighted_sum,
-    if(sum(t.volume) > 0, sum(price * t.volume) / sum(t.volume), 0) AS vwap,
-    now() AS created_at
-FROM nerve.trade_data t
+    argMinState(price, engine_timestamp) AS open_state,
+    maxState(price) AS high_state,
+    minState(price) AS low_state,
+    argMaxState(price, engine_timestamp) AS close_state,
+    sumState(volume) AS volume_state,
+    countState() AS trade_count_state,
+    sumState(price * volume) AS volume_weighted_sum_state
+FROM nerve.trade_data
 GROUP BY symbol, candle_time;
 
--- ---- 5-Minute Candles ----
--- Add 6-minute delay for production to ensure completeness
-CREATE MATERIALIZED VIEW nerve.candles_5m_mv
-TO nerve.candles_5m AS
+-- ---- 5-Minute Candles MV ----
+CREATE MATERIALIZED VIEW IF NOT EXISTS nerve.candles_5m_mv
+TO nerve.candles_5m_state AS
 SELECT
     symbol,
     toDateTime(intDiv(toUnixTimestamp(engine_timestamp), 300) * 300) AS candle_time,
-    argMin(price, engine_timestamp) AS open,
-    max(price) AS high,
-    min(price) AS low,
-    argMax(price, engine_timestamp) AS close,
-    sum(t.volume) AS volume,
-    count() AS trade_count,
-    sum(price * t.volume) AS volume_weighted_sum,
-    if(sum(t.volume) > 0, sum(price * t.volume) / sum(t.volume), 0) AS vwap,
-    now() AS created_at
-FROM nerve.trade_data t
--- Uncomment next line for production to add delay:
--- WHERE engine_timestamp <= now() - INTERVAL 6 MINUTE
+    argMinState(price, engine_timestamp) AS open_state,
+    maxState(price) AS high_state,
+    minState(price) AS low_state,
+    argMaxState(price, engine_timestamp) AS close_state,
+    sumState(volume) AS volume_state,
+    countState() AS trade_count_state,
+    sumState(price * volume) AS volume_weighted_sum_state
+FROM nerve.trade_data
 GROUP BY symbol, candle_time;
 
--- ---- 4-Hour Candles ----
--- Add delay for production to ensure completeness
-CREATE MATERIALIZED VIEW nerve.candles_4h_mv
-TO nerve.candles_4h AS
+-- ---- 4-Hour Candles MV ----
+CREATE MATERIALIZED VIEW IF NOT EXISTS nerve.candles_4h_mv
+TO nerve.candles_4h_state AS
 SELECT
     symbol,
     toDateTime(intDiv(toUnixTimestamp(engine_timestamp), 14400) * 14400) AS candle_time,
-    argMin(price, engine_timestamp) AS open,
-    max(price) AS high,
-    min(price) AS low,
-    argMax(price, engine_timestamp) AS close,
-    sum(t.volume) AS volume,
-    count() AS trade_count,
-    sum(price * t.volume) AS volume_weighted_sum,
-    if(sum(t.volume) > 0, sum(price * t.volume) / sum(t.volume), 0) AS vwap,
-    now() AS created_at
-FROM nerve.trade_data t
--- Uncomment next line for production to add delay:
--- WHERE engine_timestamp <= now() - INTERVAL 4 HOUR - INTERVAL 5 MINUTE
+    argMinState(price, engine_timestamp) AS open_state,
+    maxState(price) AS high_state,
+    minState(price) AS low_state,
+    argMaxState(price, engine_timestamp) AS close_state,
+    sumState(volume) AS volume_state,
+    countState() AS trade_count_state,
+    sumState(price * volume) AS volume_weighted_sum_state
+FROM nerve.trade_data
 GROUP BY symbol, candle_time;
 
--- ---- Daily Candles ----
--- Process all days including today for testing
-CREATE MATERIALIZED VIEW nerve.candles_1d_mv
-TO nerve.candles_1d AS
+-- ---- Daily Candles MV ----
+CREATE MATERIALIZED VIEW IF NOT EXISTS nerve.candles_1d_mv
+TO nerve.candles_1d_state AS
 SELECT
     symbol,
     toDate(engine_timestamp) AS candle_date,
-    argMin(price, engine_timestamp) AS open,
-    max(price) AS high,
-    min(price) AS low,
-    argMax(price, engine_timestamp) AS close,
-    sum(t.volume) AS volume,
-    count() AS trade_count,
-    sum(price * t.volume) AS volume_weighted_sum,
-    if(sum(t.volume) > 0, sum(price * t.volume) / sum(t.volume), 0) AS vwap,
-    now() AS created_at
-FROM nerve.trade_data t
--- Uncomment next line for production to only process previous days:
--- WHERE toDate(engine_timestamp) < today()
+    argMinState(price, engine_timestamp) AS open_state,
+    maxState(price) AS high_state,
+    minState(price) AS low_state,
+    argMaxState(price, engine_timestamp) AS close_state,
+    sumState(volume) AS volume_state,
+    countState() AS trade_count_state,
+    sumState(price * volume) AS volume_weighted_sum_state
+FROM nerve.trade_data
 GROUP BY symbol, candle_date;
 
 
 -- ================================
--- 5️⃣ USEFUL QUERIES FOR TESTING
+-- 5️⃣ QUERY VIEWS (For Reading Final Candles)
+-- ================================
+-- These views merge the states and present final OHLCV data
+
+-- ---- 1-Minute Candles Query View ----
+CREATE OR REPLACE VIEW nerve.candles_1m AS
+SELECT
+    symbol,
+    candle_time,
+    argMinMerge(open_state) AS open,
+    maxMerge(high_state) AS high,
+    minMerge(low_state) AS low,
+    argMaxMerge(close_state) AS close,
+    sumMerge(volume_state) AS volume,
+    countMerge(trade_count_state) AS trade_count,
+    sumMerge(volume_weighted_sum_state) AS volume_weighted_sum,
+    if(sumMerge(volume_state) > 0, 
+       sumMerge(volume_weighted_sum_state) / sumMerge(volume_state), 
+       0) AS vwap
+FROM nerve.candles_1m_state
+GROUP BY symbol, candle_time
+ORDER BY symbol, candle_time;
+
+-- ---- 5-Minute Candles Query View ----
+CREATE OR REPLACE VIEW nerve.candles_5m AS
+SELECT
+    symbol,
+    candle_time,
+    argMinMerge(open_state) AS open,
+    maxMerge(high_state) AS high,
+    minMerge(low_state) AS low,
+    argMaxMerge(close_state) AS close,
+    sumMerge(volume_state) AS volume,
+    countMerge(trade_count_state) AS trade_count,
+    sumMerge(volume_weighted_sum_state) AS volume_weighted_sum,
+    if(sumMerge(volume_state) > 0, 
+       sumMerge(volume_weighted_sum_state) / sumMerge(volume_state), 
+       0) AS vwap
+FROM nerve.candles_5m_state
+GROUP BY symbol, candle_time
+ORDER BY symbol, candle_time;
+
+-- ---- 4-Hour Candles Query View ----
+CREATE OR REPLACE VIEW nerve.candles_4h AS
+SELECT
+    symbol,
+    candle_time,
+    argMinMerge(open_state) AS open,
+    maxMerge(high_state) AS high,
+    minMerge(low_state) AS low,
+    argMaxMerge(close_state) AS close,
+    sumMerge(volume_state) AS volume,
+    countMerge(trade_count_state) AS trade_count,
+    sumMerge(volume_weighted_sum_state) AS volume_weighted_sum,
+    if(sumMerge(volume_state) > 0, 
+       sumMerge(volume_weighted_sum_state) / sumMerge(volume_state), 
+       0) AS vwap
+FROM nerve.candles_4h_state
+GROUP BY symbol, candle_time
+ORDER BY symbol, candle_time;
+
+-- ---- Daily Candles Query View ----
+CREATE OR REPLACE VIEW nerve.candles_1d AS
+SELECT
+    symbol,
+    candle_date,
+    argMinMerge(open_state) AS open,
+    maxMerge(high_state) AS high,
+    minMerge(low_state) AS low,
+    argMaxMerge(close_state) AS close,
+    sumMerge(volume_state) AS volume,
+    countMerge(trade_count_state) AS trade_count,
+    sumMerge(volume_weighted_sum_state) AS volume_weighted_sum,
+    if(sumMerge(volume_state) > 0, 
+       sumMerge(volume_weighted_sum_state) / sumMerge(volume_state), 
+       0) AS vwap
+FROM nerve.candles_1d_state
+GROUP BY symbol, candle_date
+ORDER BY symbol, candle_date;
+
+
+-- ================================
+-- 6️⃣ TESTING QUERIES
 -- ================================
 
--- Insert sample data for testing (remove in production)
--- INSERT INTO nerve.trade_data VALUES
---     (generateUUIDv4(), now(), now(), 'BTCUSD', 45000.0, 0.1, 'buy', 'test_user1', now()),
---     (generateUUIDv4(), now() + INTERVAL 10 SECOND, now() + INTERVAL 10 SECOND, 'BTCUSD', 45100.0, 0.2, 'sell', 'test_user2', now()),
---     (generateUUIDv4(), now() + INTERVAL 20 SECOND, now() + INTERVAL 20 SECOND, 'BTCUSD', 45200.0, 0.15, 'buy', 'test_user3', now()),
---     (generateUUIDv4(), now() + INTERVAL 70 SECOND, now() + INTERVAL 70 SECOND, 'BTCUSD', 45050.0, 0.3, 'sell', 'test_user4', now());
+-- Query to verify no duplicates (should show 1 row per symbol+candle_time):
+-- SELECT symbol, candle_time, count(*) as cnt 
+-- FROM nerve.candles_1m 
+-- GROUP BY symbol, candle_time 
+-- HAVING cnt > 1;
 
--- Query to check if everything is working:
--- SELECT 'Raw trades:' as table_name, count() as record_count FROM nerve.trade_data
+-- Check record counts:
+-- SELECT 'Raw trades' as table_name, count() as count FROM nerve.trade_data
 -- UNION ALL
--- SELECT '1m candles:' as table_name, count() as record_count FROM nerve.candles_1m
+-- SELECT '1m candles', count() FROM nerve.candles_1m
 -- UNION ALL  
--- SELECT '5m candles:' as table_name, count() as record_count FROM nerve.candles_5m
+-- SELECT '5m candles', count() FROM nerve.candles_5m
 -- UNION ALL
--- SELECT '4h candles:' as table_name, count() as record_count FROM nerve.candles_4h
+-- SELECT '4h candles', count() FROM nerve.candles_4h
 -- UNION ALL
--- SELECT '1d candles:' as table_name, count() as record_count FROM nerve.candles_1d;
+-- SELECT '1d candles', count() FROM nerve.candles_1d;

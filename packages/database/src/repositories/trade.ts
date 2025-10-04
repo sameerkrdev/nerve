@@ -1,13 +1,13 @@
 import crypto from "node:crypto";
 import { clickHouseManager } from "../index";
-import type { TradeData } from "@repo/types";
+import type { Trade } from "@repo/types";
 
 export class TradeRepository {
   private get client() {
     return clickHouseManager.getClickhouseClient();
   }
 
-  async createTrade(tradeData: TradeData): Promise<string> {
+  async create(tradeData: Trade): Promise<string> {
     const tradeId = crypto.randomUUID();
 
     await this.client.insert({
@@ -30,7 +30,7 @@ export class TradeRepository {
     return tradeId;
   }
 
-  async findById(id: string): Promise<TradeData | null> {
+  async findById(id: string): Promise<Trade | null> {
     const resultSet = await this.client.query({
       query: "SELECT * FROM trade_data WHERE id = {id:UUID} LIMIT 1",
       query_params: { id },
@@ -39,7 +39,7 @@ export class TradeRepository {
 
     for await (const rows of resultSet.stream()) {
       for (const row of rows) {
-        return JSON.parse(row.text) as TradeData;
+        return JSON.parse(row.text) as Trade;
       }
     }
 

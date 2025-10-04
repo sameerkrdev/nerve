@@ -17,17 +17,20 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@repo/database": "workspace:*",
+    "@repo/logger": "workspace:*",
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",
     "express": "^5.1.0",
-    "nodemon": "^3.1.10",
-    "@repo/logger": "workspace:*",
-    "@repo/database": "workspace:*"
+    "http-errors": "^2.0.0",
+    "nodemon": "^3.1.10"
   },
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*",
     "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@repo/types": "workspace:*",
     "@types/express": "^5.0.3",
+    "@types/http-errors": "^2.0.5",
     "@types/node": "^22.15.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
