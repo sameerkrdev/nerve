@@ -17,7 +17,7 @@
     "format": {
       "dependsOn": ["^build"]
     },
-    "type-check": {
+    "check-types": {
       "dependsOn": ["^build"],
       "outputs": []
     },
