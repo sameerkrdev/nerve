@@ -1,6 +1,6 @@
 import env from "@/config/dotenv";
 import { logger } from "@repo/logger";
-import { clickHouseManager } from "@repo/database";
+import { clickHouseManager } from "@repo/clickhouse";
 import app from "@/app";
 
 async function initializeDatabase() {

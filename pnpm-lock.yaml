@@ -23,11 +23,11 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
-  apps/api:
+  apps/api-gateway:
     dependencies:
-      "@repo/database":
+      "@repo/clickhouse":
         specifier: workspace:*
-        version: link:../../packages/database
+        version: link:../../packages/clickhouse
       "@repo/logger":
         specifier: workspace:*
         version: link:../../packages/logger
@@ -130,7 +130,7 @@ importers:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.8.3)(vite@7.1.5(@types/node@22.15.3)(yaml@2.8.1))
 
-  packages/database:
+  packages/clickhouse:
     dependencies:
       "@clickhouse/client":
         specifier: ^1.12.1

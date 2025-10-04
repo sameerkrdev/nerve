@@ -1,5 +1,5 @@
 {
-  "name": "api",
+  "name": "@repo/api-gateway",
   "version": "1.0.0",
   "description": "",
   "main": "src/server.ts",
@@ -17,7 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@repo/database": "workspace:*",
+    "@repo/clickhouse": "workspace:*",
     "@repo/logger": "workspace:*",
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",

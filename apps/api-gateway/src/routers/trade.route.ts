@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response, Router } from "express";
 import express from "express";
-import { TradeRepository } from "@repo/database";
+import { TradeRepository } from "@repo/clickhouse";
 import { logger } from "@repo/logger";
 
 import TradeController from "@/controllers/trade.controller";
