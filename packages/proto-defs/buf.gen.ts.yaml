@@ -1,0 +1,9 @@
+version: v2
+plugins:
+  - remote: buf.build/community/stephenh-ts-proto
+    out: ts/generated
+    opt:
+      - esModuleInterop=true
+      - useOptionals=messages
+      - outputServices=grpc-js
+      - env=node

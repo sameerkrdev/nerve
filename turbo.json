@@ -21,6 +21,9 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "proto-gen:all": {
+      "outputs": ["ts/generated/**", "go/generated/**"]
+    },
     "clean": {
       "cache": false,
       "outputs": []
