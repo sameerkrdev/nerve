@@ -1,6 +1,3 @@
 version: v2
-name: buf.build/nerve/proto-defs
-deps: []
-build:
-  roots:
-    - proto
+modules:
+  - path: proto

@@ -7,8 +7,8 @@ option go_package = "go/generated/order";
 import "google/protobuf/timestamp.proto";
 
 enum Side {
-    BUY = 1;
-    SELL = 2;
+    BUY = 0;
+    SELL = 1;
 }
 
 message Order {

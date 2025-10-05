@@ -12,6 +12,7 @@
     "check-types": "turbo run check-types",
     "prepare": "husky install",
     "lint-staged": "lint-staged",
+    "proto:gen": "turbo proto-gen:all",
     "infra:up": "cd infra/docker && docker compose up -d",
     "infra:down": "cd infra/docker && docker compose down",
     "infra:logs": "cd infra/docker && docker compose logs -f",

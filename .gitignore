@@ -41,3 +41,6 @@ yarn-error.log*
 
 tsconfig.tsbuildinfo
 logs
+
+ts/generated/**
+go/generated/**

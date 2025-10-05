@@ -1,6 +1,4 @@
-version: v1
+version: v2
 plugins:
-  - plugin: go
-    out: .
-  - plugin: go-grpc
+  - remote: buf.build/protocolbuffers/go # Official, use remote
     out: .
