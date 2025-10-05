@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package order;
+
+// ADD THIS LINE
+option go_package = "go/generated/order";
+
+import "google/protobuf/timestamp.proto";
+
+enum Side {
+    SIDE_UNSPECIFIED = 0;
+    BUY = 1;
+    SELL = 2;
+}
+
+message Order {
+    string id = 1;
+    string symbol = 2;
+    double price = 3;
+    uint32 volume = 4;
+    Side side = 5;
+    string userId = 6;
+    google.protobuf.Timestamp clientTimestamp = 7;
+    google.protobuf.Timestamp engineTimestamp = 8;
+}
+
+message CreateOrderRequest {
+    string symbol = 1;
+    double price = 2;
+    uint32 volume = 3;
+    Side side = 4;
+    string userId = 5;
+    google.protobuf.Timestamp clientTimestamp = 6;
+}
+
+message CreateOrderResponse {
+    string id = 1;
+}
+
+message OrderIdRequest {
+    string id = 1;
+}
+
+service OrderService {
+    rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+    rpc GetOrderById(OrderIdRequest) returns (Order);
+}
