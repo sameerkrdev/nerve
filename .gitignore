@@ -42,5 +42,5 @@ yarn-error.log*
 tsconfig.tsbuildinfo
 logs
 
-ts/generated/**
-go/generated/**
+packages/proto-defs/ts/**
+packages/proto-defs/go/**
