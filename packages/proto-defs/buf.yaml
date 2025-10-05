@@ -1,4 +1,4 @@
-version: v1beta1
+version: v2
 name: buf.build/nerve/proto-defs
 deps: []
 build:
