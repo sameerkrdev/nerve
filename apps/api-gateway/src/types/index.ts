@@ -1,5 +1,10 @@
 import type { Request } from "express";
-import type { User } from "@repo/types";
+import type { Trade, User } from "@repo/types";
+
+// For creating a user
+export interface CreateTradeRequest extends Request {
+  body: Trade;
+}
 
 // For creating a user
 export interface CreateUserRequest extends Request {
