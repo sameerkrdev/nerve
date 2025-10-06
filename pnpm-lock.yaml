@@ -31,6 +31,9 @@ importers:
       "@repo/logger":
         specifier: workspace:*
         version: link:../../packages/logger
+      "@repo/prisma":
+        specifier: workspace:*
+        version: link:../../packages/prisma
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
