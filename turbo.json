@@ -5,7 +5,7 @@
     "build": {
       "dependsOn": ["^build", "^db:generate"],
       "outputs": ["dist/**"],
-      "env": ["POSTGRSES_DATABASE_URL", "CLICKHOUSE_URL"]
+      "env": ["POSTGRES_DATABASE_URL", "CLICKHOUSE_URL"]
     },
     "dev": {
       "cache": false,
