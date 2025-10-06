@@ -2,7 +2,7 @@ import type { PrismaClientType } from "../client";
 import { prisma } from "../client";
 import type { Prisma } from "../../generated/prisma";
 
-export class UsersRepository {
+export class UserRepository {
   constructor(private client: PrismaClientType = prisma) {}
 
   async findById(id: string) {
@@ -56,4 +56,4 @@ export class UsersRepository {
 }
 
 // Export singleton instance
-export const usersRepository = new UsersRepository();
+export const userRepository = new UserRepository();
