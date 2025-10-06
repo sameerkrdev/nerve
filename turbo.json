@@ -3,13 +3,14 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": ["^build", "^db:generate"],
+      "outputs": ["dist/**"],
+      "env": ["POSTGRSES_DATABASE_URL", "CLICKHOUSE_URL"]
     },
     "dev": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "^db:generate"]
     },
     "lint": {
       "dependsOn": ["^build"]
@@ -30,6 +31,16 @@
     },
     "infra:up": {
       "outputs": []
+    },
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:deploy": {
+      "cache": false
     }
   }
 }
