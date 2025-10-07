@@ -1,0 +1,45 @@
+model Order {
+    id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+    // Order details
+    symbol   String // e.g., "BTCUSD", "ETHUSD"
+    side     OrderSide
+    type     OrderType
+    quantity Decimal   @db.Decimal(20, 8) // Total order quantity
+    price    Decimal?  @db.Decimal(20, 8)
+
+    // Order status
+    status             OrderStatus
+    filled_quantity    Decimal     @default(0) @db.Decimal(20, 8)
+    remaining_quantity Decimal     @db.Decimal(20, 8)
+    average_fill_price Decimal?    @db.Decimal(20, 8) // Average price of fills
+
+    // Additional fields
+    time_in_force TimeInForce @default(GTC)
+    stop_price    Decimal?    @db.Decimal(20, 8) // For stop orders
+
+    // Fees
+    fee_amount   Decimal? @db.Decimal(20, 8)
+    fee_currency String? // e.g., "USD", "BTC"
+
+    // User reference
+    user_id String @db.Uuid
+    user    User   @relation(fields: [user_id], references: [id])
+
+    // Relations to trades
+    maker_trades Trade[] @relation("MakerOrderTrades")
+    taker_trades Trade[] @relation("TakerOrderTrades")
+
+    // Timestamps
+    created_at   DateTime  @default(now())
+    updated_at   DateTime  @updatedAt
+    cancelled_at DateTime?
+    filled_at    DateTime? // When order was completely filled
+
+    // Indexes for performance
+    @@index([user_id])
+    @@index([symbol, status])
+    @@index([created_at])
+    @@index([status, symbol]) // For order book queries
+    @@map("orders")
+}
