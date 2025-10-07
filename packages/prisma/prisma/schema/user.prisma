@@ -1,10 +1,10 @@
 model User {
-    id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-    email      String   @unique
-    username   String?  @unique
+    id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    email    String  @unique
+    username String? @unique
 
-    password   String 
-    deleted    Boolean
+    password String
+    deleted  Boolean @default(false)
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
