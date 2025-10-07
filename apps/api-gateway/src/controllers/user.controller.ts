@@ -6,6 +6,7 @@ import type {
   ListUsersRequest,
   UpdateUserRequest,
   UserIdRequest,
+  UserIdsRequest,
 } from "@/types";
 
 export default class UserController {
@@ -30,11 +31,7 @@ export default class UserController {
   async getUser(req: UserIdRequest, res: Response, next: NextFunction) {
     try {
       const user = await this.userService.getUserById(req.params.id);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      if (!user) return res.status(404).json({ message: "User not found" });
       return res.status(200).json(user);
     } catch (error) {
       next(error);
@@ -53,11 +50,43 @@ export default class UserController {
     }
   }
 
-  // Delete user
-  async deleteUser(req: { params: { id: string } }, res: Response, next: NextFunction) {
+  // Soft delete user
+  async softDeleteUser(req: UserIdRequest, res: Response, next: NextFunction) {
     try {
-      await this.userService.deleteUser(req.params.id);
-      res.json({ message: "User deleted successfully" });
+      await this.userService.softDeleteUser(req.params.id);
+      res.json({ message: "User soft deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Hard delete many users
+  async softDeleteManyUsers(req: UserIdsRequest, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body;
+      await this.userService.softDeleteMany(ids);
+      res.json({ message: "Users permanently deleted" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Hard delete (single user)
+  async hardDeleteUser(req: UserIdRequest, res: Response, next: NextFunction) {
+    try {
+      await this.userService.hardDeleteUser(req.params.id);
+      res.json({ message: "User permanently deleted" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Hard delete many users
+  async hardDeleteManyUsers(req: UserIdsRequest, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body; // expecting an array of IDs
+      await this.userService.hardDeleteMany(ids);
+      res.json({ message: "Users permanently deleted" });
     } catch (error) {
       next(error);
     }

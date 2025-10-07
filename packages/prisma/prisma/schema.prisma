@@ -14,9 +14,36 @@ datasource db {
   url      = env("POSTGRES_DATABASE_URL")
 }
 
-model User {
-  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name     String
-  email    String @unique
-  password String
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_LIMIT
+  STOP_MARKET
+}
+
+enum OrderStatus {
+  PENDING // Order created, not yet submitted to matching engine
+  OPEN // Order in order book, waiting for match
+  PARTIAL_FILLED // Order partially filled
+  FILLED // Order completely filled
+  CANCELLED // Order cancelled by user
+  REJECTED // Order rejected by matching engine
+  EXPIRED // Order expired (if time-in-force)
+}
+
+enum TimeInForce {
+  GTC // Good Till Cancel
+  IOC // Immediate or Cancel
+  FOK // Fill or Kill
+  GTD // Good Till Date
+}
+
+enum TradeRole {
+  MAKER // Provided liquidity (passive order)
+  TAKER // Took liquidity (aggressive order)
 }

@@ -10,10 +10,12 @@ import type {
   UpdateUserRequest,
   UserIdRequest,
   ListUsersRequest,
+  UserIdsRequest,
 } from "@/types";
 
 const router: Router = express.Router();
 
+// Instantiate layers
 const userRepo = new UserRepository();
 const userService = new UserService(userRepo);
 const userController = new UserController(userService, logger);
@@ -21,6 +23,11 @@ const userController = new UserController(userService, logger);
 // CREATE USER
 router.post("/", (req: CreateUserRequest, res: Response, next: NextFunction) =>
   userController.createUser(req, res, next),
+);
+
+// LIST USERS
+router.get("/", (req: ListUsersRequest, res: Response, next: NextFunction) =>
+  userController.listUsers(req, res, next),
 );
 
 // GET USER BY ID
@@ -33,14 +40,24 @@ router.put("/:id", (req: UpdateUserRequest, res: Response, next: NextFunction) =
   userController.updateUser(req, res, next),
 );
 
-// DELETE USER
-router.delete("/:id", (req: UserIdRequest, res: Response, next: NextFunction) =>
-  userController.deleteUser(req, res, next),
+// SOFT DELETE USER
+router.delete("/soft/:id", (req: UserIdRequest, res: Response, next: NextFunction) =>
+  userController.softDeleteUser(req, res, next),
 );
 
-// LIST USERS
-router.get("/", (req: ListUsersRequest, res: Response, next: NextFunction) =>
-  userController.listUsers(req, res, next),
+// SOFT DELETE  MULTIPLE USERS
+router.delete("/soft", (req: UserIdsRequest, res: Response, next: NextFunction) =>
+  userController.softDeleteManyUsers(req, res, next),
+);
+
+// HARD DELETE USER (single)
+router.delete("/hard/:id", (req: UserIdRequest, res: Response, next: NextFunction) =>
+  userController.hardDeleteUser(req, res, next),
+);
+
+// HARD DELETE MULTIPLE USERS
+router.delete("/hard", (req: UserIdsRequest, res: Response, next: NextFunction) =>
+  userController.hardDeleteManyUsers(req, res, next),
 );
 
 export default router;
