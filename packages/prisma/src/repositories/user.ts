@@ -114,12 +114,13 @@ export class UserRepository {
     take?: number;
     where?: Prisma.UserWhereInput;
     orderBy?: Prisma.UserOrderByWithRelationInput;
-  }): Promise<User[]> {
+  }): Promise<Omit<User, "password">[]> {
     return this.client.user.findMany({
       ...(params?.skip ? { skip: params.skip } : {}),
       ...(params?.take ? { take: params.take } : {}),
       ...(params?.where ? { where: params.where } : {}),
       orderBy: params?.orderBy ?? { created_at: "desc" },
+      omit: { password: true },
     });
   }
 

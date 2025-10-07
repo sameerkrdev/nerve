@@ -11,7 +11,7 @@ model Order {
     // Order status
     status             OrderStatus
     filled_quantity    Decimal     @default(0) @db.Decimal(20, 8)
-    remaining_quantity Decimal     @db.Decimal(20, 8)
+    remaining_quantity Decimal     @default(0) @db.Decimal(20, 8)
     average_fill_price Decimal?    @db.Decimal(20, 8) // Average price of fills
 
     // Additional fields
