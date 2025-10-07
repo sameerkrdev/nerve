@@ -96,17 +96,6 @@ export class UserRepository {
   }
 
   /**
-   * Delete a user (soft delete)
-   */
-  async delete(id: string): Promise<Omit<User, "password">> {
-    return this.client.user.update({
-      where: { id },
-      data: { deleted: true },
-      omit: { password: true },
-    });
-  }
-
-  /**
    * Find many users (supports pagination, sorting, filtering)
    */
   async findMany(params?: {
@@ -122,6 +111,37 @@ export class UserRepository {
       orderBy: params?.orderBy ?? { created_at: "desc" },
       omit: { password: true },
     });
+  }
+
+  /**
+   * Soft delete a single user
+   */
+  async softDelete(id: string): Promise<Omit<User, "password">> {
+    const user = await this.client.user.update({
+      where: { id },
+      data: { deleted: true },
+    });
+    // Remove password field before returning
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...rest } = user;
+    return rest;
+  }
+
+  /**
+   * Soft delete multiple users by ID
+   */
+  async softDeleteMany(ids: string[]): Promise<Prisma.BatchPayload> {
+    return this.client.user.updateMany({
+      where: { id: { in: ids } },
+      data: { deleted: true },
+    });
+  }
+
+  /**
+   * Delete a single user
+   */
+  async delete(where: Prisma.UserWhereUniqueInput): Promise<User> {
+    return this.client.user.delete({ where });
   }
 
   /**
