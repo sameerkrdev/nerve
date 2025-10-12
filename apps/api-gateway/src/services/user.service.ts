@@ -5,8 +5,8 @@ export default class UserService {
   constructor(private userRepo: UserRepository) {}
 
   async createUser(user: User) {
-    const existing = await this.userRepo.findUsersWithFilter({ email: user.email });
-    if (existing.length > 0) throw new Error("User already exists");
+    const isExists = await this.userRepo.findByEmail(user.email);
+    if (isExists) throw new Error("User already exists");
     return this.userRepo.create(user);
   }
 
@@ -20,10 +20,26 @@ export default class UserService {
     return this.userRepo.update(id, data);
   }
 
-  async deleteUser(id: string) {
+  async softDeleteUser(id: string) {
     const existing = await this.userRepo.findById(id);
     if (!existing) throw new Error("User not found");
-    return this.userRepo.delete(id);
+    return this.userRepo.softDelete(id);
+  }
+
+  async softDeleteMany(userIds: string[]) {
+    if (!userIds?.length) throw new Error("No user IDs provided");
+    return this.userRepo.softDeleteMany(userIds);
+  }
+
+  async hardDeleteUser(id: string) {
+    const existing = await this.userRepo.findById(id);
+    if (!existing) throw new Error("User not found");
+    return this.userRepo.delete({ id });
+  }
+
+  async hardDeleteMany(userIds: string[]) {
+    if (!userIds?.length) throw new Error("No user IDs provided");
+    return this.userRepo.deleteMany({ id: { in: userIds } });
   }
 
   async listUsers(params: { skip?: number; take?: number }) {

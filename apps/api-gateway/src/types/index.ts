@@ -22,10 +22,28 @@ export interface UserIdRequest extends Request {
   params: { id: string };
 }
 
+export interface UserIdsRequest extends Request {
+  body: { ids: string[] };
+}
+
 // For listing users with optional pagination
 export interface ListUsersRequest extends Request {
   query: {
     skip?: string;
     take?: string;
   };
+}
+
+// Express request body
+type Order = {
+  symbol: string;
+  price: number;
+  quantity: number;
+  side: "BUY" | "SELL";
+  type: "MARKET" | "LIMIT";
+  userId: string;
+};
+
+export interface CreateOrderRequest extends Request {
+  body: Order;
 }
