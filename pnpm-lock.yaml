@@ -25,6 +25,12 @@ importers:
 
   apps/api-gateway:
     dependencies:
+      "@grpc/grpc-js":
+        specifier: ^1.14.0
+        version: 1.14.0
+      "@grpc/proto-loader":
+        specifier: ^0.8.0
+        version: 0.8.0
       "@repo/clickhouse":
         specifier: workspace:*
         version: link:../../packages/clickhouse
@@ -34,6 +40,9 @@ importers:
       "@repo/prisma":
         specifier: workspace:*
         version: link:../../packages/prisma
+      "@repo/proto-defs":
+        specifier: workspace:*
+        version: link:../../packages/proto-defs
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
@@ -279,9 +288,21 @@ importers:
 
   apps/order-service:
     dependencies:
+      "@grpc/grpc-js":
+        specifier: ^1.14.0
+        version: 1.14.0
+      "@grpc/proto-loader":
+        specifier: ^0.8.0
+        version: 0.8.0
       "@repo/logger":
         specifier: workspace:*
         version: link:../../packages/logger
+      "@repo/prisma":
+        specifier: workspace:*
+        version: link:../../packages/prisma
+      "@repo/proto-defs":
+        specifier: workspace:*
+        version: link:../../packages/proto-defs
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2

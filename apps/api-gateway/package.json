@@ -17,8 +17,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.0",
+    "@grpc/proto-loader": "^0.8.0",
     "@repo/clickhouse": "workspace:*",
     "@repo/logger": "workspace:*",
+    "@repo/proto-defs": "workspace:*",
     "@repo/prisma": "workspace:*",
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",

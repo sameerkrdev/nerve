@@ -5,7 +5,8 @@
     "rootDir": "src",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@repo/proto-defs/ts/*": ["node_modules/@repo/proto-defs/ts/generated/*"]
     }
   },
   "include": ["src"],
