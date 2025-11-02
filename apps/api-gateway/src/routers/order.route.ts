@@ -8,7 +8,17 @@ import type { CreateOrderRequest } from "@/types";
 
 const router: Router = express.Router();
 
-const orderClient = new OrderServiceClient("localhost:50051", grpc.credentials.createInsecure());
+const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || "localhost:50051";
+const credentials =
+  process.env.NODE_ENV === "production"
+    ? grpc.credentials.createSsl()
+    : grpc.credentials.createInsecure();
+
+const orderClient = new OrderServiceClient(ORDER_SERVICE_URL, credentials, {
+  "grpc.keepalive_time_ms": 30000,
+  "grpc.keepalive_timeout_ms": 10000,
+});
+
 logger.info("Connected to Order gRPC service at localhost:50051");
 
 const orderController = new OrderController(logger, orderClient);

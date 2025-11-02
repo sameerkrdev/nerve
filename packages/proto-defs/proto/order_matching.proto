@@ -21,7 +21,7 @@ enum Type {
 }
 
 enum Status {
-   ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_UNSPECIFIED = 0;
   PENDING = 1;
   OPEN = 2;
   PARTIAL_FILLED = 3;

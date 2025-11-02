@@ -21,22 +21,26 @@ export class GrpcServer {
 
     // Define service implementation
     const orderServiceImpl: OrderServiceServer = {
-      createOrder: orderController.createOrder,
+      createOrder: orderController.createOrder.bind(orderController),
     };
 
     // Add service to server
     this.server.addService(OrderServiceService, orderServiceImpl);
   }
 
-  start(): void {
-    this.server.bindAsync(this.address, grpc.ServerCredentials.createInsecure(), (err, port) => {
-      if (err) {
-        this.logger.error("Failed to start gRPC server", { error: err });
-        throw err;
-      }
+  start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.server.bindAsync(this.address, grpc.ServerCredentials.createInsecure(), (err, port) => {
+        if (err) {
+          this.logger.error("Failed to start gRPC server", { error: err });
+          reject(err);
+          return;
+        }
 
-      this.logger.info(`gRPC server running at ${this.address} on port ${port}`);
-      this.server.start();
+        this.logger.info(`gRPC server running at ${this.address} on port ${port}`);
+        this.server.start();
+        resolve();
+      });
     });
   }
 

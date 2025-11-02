@@ -105,8 +105,8 @@ export class UserRepository {
     orderBy?: Prisma.UserOrderByWithRelationInput;
   }): Promise<Omit<User, "password">[]> {
     return this.client.user.findMany({
-      ...(params?.skip ? { skip: params.skip } : {}),
-      ...(params?.take ? { take: params.take } : {}),
+      ...(params?.skip !== undefined ? { skip: params.skip } : {}),
+      ...(params?.take !== undefined ? { take: params.take } : {}),
       ...(params?.where ? { where: params.where } : {}),
       orderBy: params?.orderBy ?? { created_at: "desc" },
       omit: { password: true },
@@ -117,14 +117,11 @@ export class UserRepository {
    * Soft delete a single user
    */
   async softDelete(id: string): Promise<Omit<User, "password">> {
-    const user = await this.client.user.update({
+    return this.client.user.update({
       where: { id },
       data: { deleted: true },
+      omit: { password: true },
     });
-    // Remove password field before returning
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...rest } = user;
-    return rest;
   }
 
   /**

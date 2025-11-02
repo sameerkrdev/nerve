@@ -40,6 +40,5 @@ model Order {
     @@index([user_id])
     @@index([symbol, status])
     @@index([created_at])
-    @@index([status, symbol]) // For order book queries
     @@map("orders")
 }

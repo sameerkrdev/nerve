@@ -65,7 +65,7 @@ export default class UserController {
     try {
       const { ids } = req.body;
       await this.userService.softDeleteMany(ids);
-      res.json({ message: "Users permanently deleted" });
+      res.json({ message: "Users soft deleted" });
     } catch (error) {
       next(error);
     }
@@ -95,8 +95,9 @@ export default class UserController {
   // List users
   async listUsers(req: ListUsersRequest, res: Response, next: NextFunction) {
     try {
-      const skip = Number(req.query.skip || 0);
-      const take = Number(req.query.take || 10);
+      const skip = Math.max(0, parseInt(req.query.skip as string, 10) || 0);
+      const take = Math.max(1, Math.min(100, parseInt(req.query.take as string, 10) || 10));
+
       const users = await this.userService.listUsers({ skip, take });
       res.json(users);
     } catch (error) {

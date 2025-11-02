@@ -2,7 +2,6 @@ import type { Request } from "express";
 import type { Trade, User } from "@repo/types";
 import type { Side, Type } from "@repo/proto-defs/ts/order_service";
 
-// For creating a user
 export interface CreateTradeRequest extends Request {
   body: Trade;
 }

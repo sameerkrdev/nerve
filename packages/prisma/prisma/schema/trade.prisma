@@ -10,15 +10,15 @@ model Trade {
     maker_order_id String @db.Uuid
     taker_order_id String @db.Uuid
 
-    maker_order Order @relation("MakerOrderTrades", fields: [maker_order_id], references: [id])
-    taker_order Order @relation("TakerOrderTrades", fields: [taker_order_id], references: [id])
+    maker_order Order @relation("MakerOrderTrades", fields: [maker_order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    taker_order Order @relation("TakerOrderTrades", fields: [taker_order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
     // User references (denormalized for quick access)
     maker_user_id String @db.Uuid
     taker_user_id String @db.Uuid
 
-    maker_user User @relation("MakerUserTrades", fields: [maker_user_id], references: [id])
-    taker_user User @relation("TakerUserTrades", fields: [taker_user_id], references: [id])
+    maker_user User @relation("MakerUserTrades", fields: [maker_user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    taker_user User @relation("TakerUserTrades", fields: [taker_user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
     // Trade sides
     maker_side OrderSide // BUY or SELL

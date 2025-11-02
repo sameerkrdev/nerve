@@ -1,4 +1,5 @@
-import type { Prisma, Order, OrderStatus, OrderSide } from "../../generated/prisma";
+import type { Prisma, Order, OrderSide } from "../../generated/prisma";
+import { OrderStatus } from "../../generated/prisma";
 import { prisma, type PrismaClientType } from "../client";
 
 export class OrderRepository {
@@ -56,10 +57,18 @@ export class OrderRepository {
    * Cancel an order
    */
   async cancel(id: string): Promise<Order> {
+    const order = await this.findById(id);
+    if (!order) {
+      throw new Error("Order not found");
+    }
+    if (order.status !== OrderStatus.OPEN && order.status !== OrderStatus.PARTIAL_FILLED) {
+      throw new Error(`Cannot cancel order with status ${order.status}`);
+    }
+
     return this.client.order.update({
       where: { id },
       data: {
-        status: "CANCELLED",
+        status: OrderStatus.CANCELLED,
         cancelled_at: new Date(),
       },
     });
@@ -72,7 +81,7 @@ export class OrderRepository {
     return this.client.order.findMany({
       where: {
         symbol,
-        status: "OPEN",
+        status: OrderStatus.OPEN,
         ...(side && { side }),
       },
       orderBy: {
