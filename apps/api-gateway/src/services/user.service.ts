@@ -15,15 +15,15 @@ export default class UserService {
   }
 
   async updateUser(id: string, data: Partial<User>) {
-    const existing = await this.userRepo.findById(id);
-    if (!existing) throw new Error("User not found");
-    return this.userRepo.update(id, data);
+    const updated = await this.userRepo.update(id, data);
+    if (!updated) throw new Error("User not found");
+    return updated;
   }
 
   async softDeleteUser(id: string) {
-    const existing = await this.userRepo.findById(id);
-    if (!existing) throw new Error("User not found");
-    return this.userRepo.softDelete(id);
+    const deleted = await this.userRepo.softDelete(id);
+    if (!deleted) throw new Error("User not found");
+    return deleted;
   }
 
   async softDeleteMany(userIds: string[]) {
