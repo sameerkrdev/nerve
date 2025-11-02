@@ -36,7 +36,7 @@ message PlaceOrderResponse {
   string symbol = 2;
   Status status = 3;
   string reason = 4;
-  google.protobuf.Timestamp engine_timeline = 5;
+  google.protobuf.Timestamp engine_timestamp = 5;
 }
 
 message PlaceOrderRequest {
@@ -46,7 +46,7 @@ message PlaceOrderRequest {
   uint32 quantity = 4;
   Side side = 5;
   Type type = 6;
-  google.protobuf.Timestamp engine_timeline = 7;
+  google.protobuf.Timestamp engine_timestamp = 7;
   string user_id = 8;
 }
 

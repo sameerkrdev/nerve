@@ -26,7 +26,7 @@ export class OrderController {
       side: Side[side as keyof typeof Side],
       type: Type[type as keyof typeof Type],
       userId: "user-123",
-      clientTimeline: new Date(),
+      clientTimestamp: new Date(),
     };
 
     this.grpcEngine.createOrder(

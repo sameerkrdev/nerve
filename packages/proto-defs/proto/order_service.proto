@@ -52,7 +52,7 @@ message CreateOrderRequest {
   Side side = 4;
   Type type = 5;
   string user_id = 6;
-  google.protobuf.Timestamp client_timeline = 7;
+  google.protobuf.Timestamp client_timestamp = 7;
 }
 
 service OrderService {
