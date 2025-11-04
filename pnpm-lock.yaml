@@ -65,6 +65,9 @@ importers:
       "@repo/typescript-config":
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      "@repo/validator":
+        specifier: workspace:*
+        version: link:../../packages/validator
       "@types/express":
         specifier: ^5.0.3
         version: 5.0.3
@@ -521,6 +524,9 @@ importers:
       "@repo/eslint-config":
         specifier: workspace:*
         version: link:../eslint-config
+      "@repo/proto-defs":
+        specifier: workspace:*
+        version: link:../proto-defs
       "@repo/typescript-config":
         specifier: workspace:*
         version: link:../typescript-config
@@ -563,6 +569,28 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
+
+  packages/validator:
+    dependencies:
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
+    devDependencies:
+      "@repo/eslint-config":
+        specifier: workspace:*
+        version: link:../eslint-config
+      "@repo/types":
+        specifier: workspace:*
+        version: link:../types
+      "@repo/typescript-config":
+        specifier: workspace:*
+        version: link:../typescript-config
+      "@types/node":
+        specifier: ^22.15.3
+        version: 22.15.3
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
 
 packages:
   "@bufbuild/buf-darwin-arm64@1.57.2":
@@ -5033,6 +5061,12 @@ packages:
       }
     engines: { node: ">=10" }
 
+  zod@4.1.12:
+    resolution:
+      {
+        integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==,
+      }
+
 snapshots:
   "@bufbuild/buf-darwin-arm64@1.57.2":
     optional: true
@@ -7930,3 +7964,5 @@ snapshots:
   yn@3.1.1: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.1.12: {}
