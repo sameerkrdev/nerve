@@ -297,6 +297,9 @@ importers:
       "@grpc/proto-loader":
         specifier: ^0.8.0
         version: 0.8.0
+      "@repo/kakfa-client":
+        specifier: workspace:*
+        version: link:../../packages/kafka-client
       "@repo/logger":
         specifier: workspace:*
         version: link:../../packages/logger
@@ -453,6 +456,34 @@ importers:
       typescript-eslint:
         specifier: ^8.40.0
         version: 8.40.0(eslint@9.34.0(jiti@2.6.1))(typescript@5.9.2)
+
+  packages/kafka-client:
+    dependencies:
+      "@repo/logger":
+        specifier: workspace:*
+        version: link:../logger
+      "@repo/validator":
+        specifier: workspace:*
+        version: link:../validator
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+    devDependencies:
+      "@repo/eslint-config":
+        specifier: workspace:*
+        version: link:../eslint-config
+      "@repo/types":
+        specifier: workspace:*
+        version: link:../types
+      "@repo/typescript-config":
+        specifier: workspace:*
+        version: link:../typescript-config
+      "@types/node":
+        specifier: ^22.15.3
+        version: 22.15.3
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
 
   packages/logger:
     dependencies:
@@ -3383,6 +3414,13 @@ packages:
         integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==,
       }
     engines: { node: ">=4.0" }
+
+  kafkajs@2.2.4:
+    resolution:
+      {
+        integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==,
+      }
+    engines: { node: ">=14.0.0" }
 
   keyv@4.5.4:
     resolution:
@@ -6834,6 +6872,8 @@ snapshots:
       array.prototype.flat: 1.3.3
       object.assign: 4.1.7
       object.values: 1.2.1
+
+  kafkajs@2.2.4: {}
 
   keyv@4.5.4:
     dependencies:

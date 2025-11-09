@@ -21,11 +21,11 @@ export class OrderController {
 
     const grpcRequest: GrpcCreateOrderRequest = {
       symbol,
-      price,
+      price: price!, // TODO: price is optional in proto, but required for limit orders
       quantity,
       side: Side[side as keyof typeof Side],
       type: Type[type as keyof typeof Type],
-      userId: "user-123",
+      userId: "d8036c81-a1d7-45de-b4d8-e3847bfadd3b",
       clientTimestamp: new Date(),
     };
 
