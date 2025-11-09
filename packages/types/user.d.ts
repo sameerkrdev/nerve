@@ -1,9 +1,9 @@
 export type User = {
-    name: string;
-    email: string;
-    password: string;
-}
+  username: string;
+  email: string;
+  password: string;
+};
 
 export interface UserData extends User {
-    id: string
+  id: string;
 }
