@@ -23,10 +23,10 @@ class KafkaConsumer {
       env.KAFKA_BROKERS.split(","),
     );
     this.orderRepo = new OrderRepository();
-    this.orderController = new OrderServerController(this.logger, this.kafkaClient, this.orderRepo);
+    this.orderController = new OrderServerController(this.logger, this.orderRepo);
   }
 
-  startConsuming(): void {
+  async startConsuming(): Promise<void> {
     this.kafkaClient.subscribe<
       CreateOrderRequest & { id: string; status: Status; eventType: string }
     >(
@@ -47,6 +47,11 @@ class KafkaConsumer {
         }
       },
     );
+  }
+
+  async shutdown(): Promise<void> {
+    await this.kafkaClient.disconnectConsumer();
+    this.logger.info("Kafka consumer disconnected");
   }
 }
 

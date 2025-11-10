@@ -102,7 +102,12 @@ class KafkaClient {
     });
   }
 
-  async disconnect() {
+  async disconnectConsumer() {
+    if (this.producer) await this.producer.disconnect();
+    this.log.info("Consumer disconnected");
+  }
+
+  async disconnectProducer() {
     if (this.producer) await this.producer.disconnect();
     this.log.info("Producer disconnected");
   }
