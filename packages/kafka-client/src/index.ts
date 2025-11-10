@@ -109,3 +109,4 @@ class KafkaClient {
 }
 
 export { KafkaClient, type Producer, type Consumer };
+export * from "./constants";

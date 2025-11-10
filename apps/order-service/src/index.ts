@@ -1,8 +1,9 @@
 import { logger } from "@repo/logger";
 import { GrpcServer } from "@/grpc.server";
 import KafkaConsumer from "@/kafka.consumer";
+import env from "@/config/dotenv";
 
-const server = new GrpcServer(logger, "0.0.0.0:50051");
+const server = new GrpcServer(logger, env.ORDER_SERVICE_GRPC_URL);
 server.initialize();
 server.start();
 

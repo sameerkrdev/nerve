@@ -2,7 +2,8 @@ import * as grpc from "@grpc/grpc-js";
 import { OrderServiceService, type OrderServiceServer } from "@repo/proto-defs/ts/order_service";
 import { type Logger } from "@repo/logger";
 import { OrderServerController } from "@/controllers/order.controller";
-import { KafkaClient } from "@repo/kakfa-client";
+import { KafkaClient, KAFKA_CLIENT_ID } from "@repo/kakfa-client";
+import env from "@/config/dotenv";
 
 export class GrpcServer {
   private server: grpc.Server;
@@ -13,11 +14,10 @@ export class GrpcServer {
     private readonly address: string,
   ) {
     this.server = new grpc.Server();
-    this.kafkaCient = new KafkaClient("order-producer-service", [
-      "localhost:19092",
-      "localhost:19093",
-      "localhost:19094",
-    ]);
+    this.kafkaCient = new KafkaClient(
+      KAFKA_CLIENT_ID.ORDER_PRODUCER_SERVICE,
+      env.KAFKA_BROKERS.split(","),
+    );
   }
 
   initialize(): void {

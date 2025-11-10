@@ -7,21 +7,22 @@ import { logger } from "@repo/logger";
 import type { CreateOrderRequest } from "@/types";
 import { PlaceOrderValidator } from "@repo/validator";
 import zodValidatorMiddleware from "@/middlewares/zod.validator.middleware";
+import env from "@/config/dotenv";
 
 const router: Router = express.Router();
 
-const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || "localhost:50051";
+const ORDER_SERVICE_GRPC_URL = env.ORDER_SERVICE_GRPC_URL;
 const credentials =
   process.env.NODE_ENV === "production"
     ? grpc.credentials.createSsl()
     : grpc.credentials.createInsecure();
 
-const orderClient = new OrderServiceClient(ORDER_SERVICE_URL, credentials, {
+const orderClient = new OrderServiceClient(ORDER_SERVICE_GRPC_URL, credentials, {
   "grpc.keepalive_time_ms": 30000,
   "grpc.keepalive_timeout_ms": 10000,
 });
 
-logger.info("Connected to Order gRPC service at localhost:50051");
+logger.info(`Connected to Order gRPC service at ${ORDER_SERVICE_GRPC_URL}`);
 
 const orderController = new OrderController(logger, orderClient);
 
