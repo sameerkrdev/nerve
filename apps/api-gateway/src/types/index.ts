@@ -1,6 +1,6 @@
 import type { Request } from "express";
 import type { Trade, User } from "@repo/types";
-import type { Side, Type } from "@repo/proto-defs/ts/order_service";
+import type { PlaceOrder } from "@repo/validator";
 
 export interface CreateTradeRequest extends Request {
   body: Trade;
@@ -34,18 +34,18 @@ export interface ListUsersRequest extends Request {
   };
 }
 
-type OrderSideKeys = keyof typeof Side;
-type OrderTypeKeys = keyof typeof Type;
+// type OrderSideKeys = keyof typeof Side;
+// type OrderTypeKeys = keyof typeof Type;
 
 // Express request body
-type Order = {
-  symbol: string;
-  price: number;
-  quantity: number;
-  side: OrderSideKeys;
-  type: OrderTypeKeys;
-};
+// type Order = {
+//   symbol: string;
+//   price: number;
+//   quantity: number;
+//   side: OrderSideKeys;
+//   type: OrderTypeKeys;
+// };
 
 export interface CreateOrderRequest extends Request {
-  body: Order;
+  body: PlaceOrder["body"];
 }

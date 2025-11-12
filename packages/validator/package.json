@@ -1,5 +1,5 @@
 {
-  "name": "@repo/prisma",
+  "name": "@repo/validator",
   "version": "1.0.0",
   "description": "",
   "main": "./dist/index.js",
@@ -14,29 +14,19 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
-    "check-types": "tsc --noEmit -p tsconfig.json",
-    "db:studio": "prisma studio",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev --skip-generate",
-    "db:deploy": "prisma migrate deploy"
+    "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "zod": "^4.1.12"
+  },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@repo/types": "workspace:*",
     "@types/node": "^22.15.3",
-    "prisma": "^6.16.3",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.16.3",
-    "@prisma/extension-accelerate": "^2.0.2",
-    "dotenv": "^17.2.2",
-    "envalid": "^8.1.0"
-  },
-  "prisma": {
-    "schema": "./prisma"
+    "typescript": "^5.9.2"
   }
 }

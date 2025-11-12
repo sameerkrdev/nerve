@@ -18,9 +18,9 @@ export default class UserController {
   // Create user
   async createUser(req: CreateUserRequest, res: Response, next: NextFunction) {
     try {
-      const { name, email, password } = req.body;
-      await this.userService.createUser({ name, email, password });
-      this.logger.info("New user is created", { name, email });
+      const { username, email, password } = req.body;
+      await this.userService.createUser({ username, email, password });
+      this.logger.info("New user is created", { username, email });
       res.status(201).json({ message: "New user is created" });
     } catch (error) {
       next(error);
