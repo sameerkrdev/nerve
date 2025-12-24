@@ -3,7 +3,7 @@ import type {
   MatchingEngineClient,
   PlaceOrderRequest,
   PlaceOrderResponse,
-} from "@repo/proto-defs/ts/order_matching";
+} from "@repo/proto-defs/ts/engine/order_matching";
 
 export class OrderGrpcClient {
   constructor(

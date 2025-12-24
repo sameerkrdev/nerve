@@ -6,10 +6,11 @@ import {
 } from "@repo/kakfa-client";
 import type { Logger } from "@repo/logger";
 import { logger } from "@repo/logger";
-import type { CreateOrderRequest, Status } from "@repo/proto-defs/ts/order_service";
+import type { CreateOrderRequest } from "@repo/proto-defs/ts/api/order_service";
 import { OrderServerController } from "@/controllers/order.controller";
 import { OrderRepository } from "@repo/prisma";
 import env from "@/config/dotenv";
+import type { OrderStatus } from "@repo/proto-defs/ts/common/order_types";
 
 class KafkaConsumer {
   private kafkaClient: KafkaClient;
@@ -28,7 +29,7 @@ class KafkaConsumer {
 
   async startConsuming(): Promise<void> {
     this.kafkaClient.subscribe<
-      CreateOrderRequest & { id: string; status: Status; eventType: string }
+      CreateOrderRequest & { id: string; status: OrderStatus; eventType: string }
     >(
       KAFKA_CONSUMER_GROUP_ID.ORDER_CONSUMER_SERVICE_1,
       KAFKA_TOPICS.ORDERS,

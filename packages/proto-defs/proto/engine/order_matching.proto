@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package engine.matching;
+
+option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine/matching";
+
+import "google/protobuf/timestamp.proto";
+import "common/order_types.proto";
+
+message PlaceOrderRequest {
+  string id = 1;
+  string symbol = 2;
+  uint64 price = 3;
+  uint32 quantity = 4;
+  common.order.Side side = 5;
+  common.order.OrderType type = 6;
+  string user_id = 7;
+  google.protobuf.Timestamp engine_timestamp = 8;
+}
+
+message PlaceOrderResponse {
+  string id = 1;
+  string symbol = 2;
+  common.order.OrderStatus status = 3;
+  string reason = 4;
+  google.protobuf.Timestamp engine_timestamp = 5;
+}
+
+service MatchingEngine {
+  rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
+}

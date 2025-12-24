@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package common.order;
+
+option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common/order";
+
+enum Side {
+  BUY = 0;
+  SELL = 1;
+}
+
+enum OrderType {
+  MARKET = 0;
+  LIMIT = 1;
+  STOP_LIMIT = 2;
+  STOP_MARKET = 3;
+}
+
+enum OrderStatus {
+  PENDING = 0;
+  OPEN = 1;
+  PARTIAL_FILLED = 2;
+  FILLED = 3;
+  CANCELLED = 4;
+  REJECTED = 5;
+  EXPIRED = 6;
+}

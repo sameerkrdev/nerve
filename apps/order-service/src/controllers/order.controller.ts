@@ -1,13 +1,22 @@
 import * as grpc from "@grpc/grpc-js";
 import type { KafkaClient } from "@repo/kakfa-client";
 import type { Logger } from "@repo/logger";
-import type { CreateOrderRequest, CreateOrderResponse } from "@repo/proto-defs/ts/order_service";
-import { Status } from "@repo/proto-defs/ts/order_service";
+import type {
+  MatchingEngineClient,
+  PlaceOrderRequest,
+  PlaceOrderResponse,
+} from "@repo/proto-defs/ts/engine/order_matching";
+import type {
+  CreateOrderRequest,
+  CreateOrderResponse,
+} from "@repo/proto-defs/ts/api/order_service";
+import { OrderStatus as Status } from "@repo/proto-defs/ts/common/order_types";
 
 export class OrderServerController {
   constructor(
     private readonly logger: Logger,
     private kafkaClient: KafkaClient,
+    private matchingEngineClient: MatchingEngineClient,
   ) {}
 
   async placeOrder(
@@ -15,30 +24,60 @@ export class OrderServerController {
     callback: grpc.sendUnaryData<CreateOrderResponse>,
   ): Promise<void> {
     const order = call.request;
-    this.logger.info("Received order request", { order });
+    const orderId = crypto.randomUUID();
+
+    this.logger.info("Received order request", { order, orderId });
 
     try {
-      const orderId = crypto.randomUUID();
-
-      // Send this to kafka for order persistence
-      this.kafkaClient.sendMessage<
-        CreateOrderRequest & { id: string; status: Status; eventType: string }
-      >("orders", { id: orderId, status: Status.PENDING, eventType: "create", ...order });
-
-      // Place the order to matching engine
-
-      const response = {
+      await this.kafkaClient.sendMessage<
+        CreateOrderRequest & {
+          id: string;
+          status: Status;
+          eventType: "create";
+        }
+      >("orders", {
         id: orderId,
-        ...order,
         status: Status.PENDING,
-        reason: "Order placed successfully",
+        eventType: "create",
+        ...order,
+      });
+
+      const request: PlaceOrderRequest = {
+        id: orderId,
+        symbol: order.symbol,
+        price: order.price,
+        quantity: order.quantity,
+        side: order.side,
+        type: order.type,
+        userId: order.userId,
       };
 
-      this.logger.info("Order placed successfully");
-      callback(null, response);
+      const response = await new Promise<PlaceOrderResponse>((resolve, reject) => {
+        this.matchingEngineClient.placeOrder(
+          request,
+          (err: grpc.ServiceError | null, res: PlaceOrderResponse) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(res);
+          },
+        );
+      });
+
+      this.logger.info("Order placed successfully", {
+        orderId,
+        engineStatus: response.status,
+      });
+
+      callback(null, {
+        ...order,
+        ...response,
+      });
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      this.logger.error("Failed to create order", {
+
+      this.logger.error("Failed to place order", {
+        orderId,
         message: err.message,
         stack: err.stack,
       });
@@ -46,7 +85,7 @@ export class OrderServerController {
       callback(
         {
           code: grpc.status.INTERNAL,
-          message: err.message || "Failed to create order",
+          message: "Failed to place order",
           name: "CreateOrderError",
         } as grpc.ServiceError,
         null,

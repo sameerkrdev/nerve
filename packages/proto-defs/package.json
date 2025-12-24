@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "clean": "rm -rf go ts",
     "gen:ts": "buf generate --template buf.gen.ts.yaml",
     "gen:go": "buf generate --template buf.gen.go.yaml",
-    "proto-gen:all": "pnpm run gen:ts && pnpm run gen:go"
+    "go:init": "mkdir -p go/generated && (cd go/generated && [ -f go.mod ] || go mod init github.com/sameerkrdev/nerve/packages/proto-defs/go/generated) && (cd go/generated && go mod edit -replace github.com/sameerkrdev/nerve/packages/proto-defs/go/generated=.)",
+    "go:tidy": "cd go/generated && go mod tidy",
+    "proto-gen:all": "pnpm clean && pnpm gen:ts && pnpm gen:go && pnpm go:init && pnpm go:tidy"
   },
   "devDependencies": {
     "@bufbuild/buf": "^1.57.2",

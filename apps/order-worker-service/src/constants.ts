@@ -1,4 +1,8 @@
-import { Side, Status, Type } from "@repo/proto-defs/ts/order_service";
+import {
+  Side,
+  OrderStatus as Status,
+  OrderType as Type,
+} from "@repo/proto-defs/ts/common/order_types";
 
 const OrderStatusEnumStringMap: Record<number, string> = {
   [Status.PENDING]: "PENDING",

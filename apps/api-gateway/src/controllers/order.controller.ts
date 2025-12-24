@@ -2,13 +2,13 @@ import { type Logger } from "@repo/logger";
 import type { Response, NextFunction } from "express";
 import type { CreateOrderRequest } from "@/types";
 import {
-  Side,
-  Type,
   type CreateOrderResponse,
   type CreateOrderRequest as GrpcCreateOrderRequest,
   type OrderServiceClient,
-} from "@repo/proto-defs/ts/order_service";
+} from "@repo/proto-defs/ts/api/order_service";
+
 import type grpc from "@grpc/grpc-js";
+import { Side, OrderType as Type } from "@repo/proto-defs/ts/common/order_types";
 
 export class OrderController {
   constructor(

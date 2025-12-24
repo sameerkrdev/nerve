@@ -1,9 +1,13 @@
 import * as grpc from "@grpc/grpc-js";
-import { OrderServiceService, type OrderServiceServer } from "@repo/proto-defs/ts/order_service";
+import {
+  OrderServiceService,
+  type OrderServiceServer,
+} from "@repo/proto-defs/ts/api/order_service";
 import { type Logger } from "@repo/logger";
 import { OrderServerController } from "@/controllers/order.controller";
 import { KafkaClient, KAFKA_CLIENT_ID } from "@repo/kakfa-client";
 import env from "@/config/dotenv";
+import { MatchingEngineGrpcClient } from "./grpc.client";
 
 export class GrpcServer {
   private server: grpc.Server;
@@ -21,8 +25,13 @@ export class GrpcServer {
   }
 
   initialize(): void {
-    // Initialize dependencies
-    const orderController = new OrderServerController(this.logger, this.kafkaCient);
+    const matchingEngineClient = new MatchingEngineGrpcClient().start();
+
+    const orderController = new OrderServerController(
+      this.logger,
+      this.kafkaCient,
+      matchingEngineClient,
+    );
 
     // Define service implementation
     const orderServiceImpl: OrderServiceServer = {
