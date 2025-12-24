@@ -27,7 +27,7 @@ export class OrderServerController {
 
     try {
       const request: PlaceOrderRequest = {
-        id: orderId,
+        clientOrderId: orderId,
         symbol: order.symbol,
         price: order.price,
         quantity: order.quantity,

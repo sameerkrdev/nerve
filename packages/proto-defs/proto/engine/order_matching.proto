@@ -8,22 +8,33 @@ import "google/protobuf/timestamp.proto";
 import "common/order_types.proto";
 
 message PlaceOrderRequest {
-  string id = 1;
-  string symbol = 2;
-  uint64 price = 3;
-  uint32 quantity = 4;
-  common.order.Side side = 5;
-  common.order.OrderType type = 6;
-  string user_id = 7;
-  google.protobuf.Timestamp engine_timestamp = 8;
+  string symbol = 1;
+  uint64 price = 2;
+  uint32 quantity = 3;
+  common.order.Side side = 4;
+  common.order.OrderType type = 5;
+  string user_id = 6;
+  string client_order_id = 7;
+  google.protobuf.Timestamp client_timestamp = 8;
+  google.protobuf.Timestamp gateway_timestamp = 9;
 }
 
 message PlaceOrderResponse {
-  string id = 1;
-  string symbol = 2;
-  common.order.OrderStatus status = 3;
-  string reason = 4;
-  google.protobuf.Timestamp engine_timestamp = 5;
+  string symbol = 1;
+  uint64 price = 2;
+  uint32 quantity = 3;
+  uint32 remaining_quantity = 4;
+  common.order.Side side = 5;
+  common.order.OrderType type = 6;
+  string user_id = 7;
+  string client_order_id = 8;
+  google.protobuf.Timestamp client_timestamp = 9;
+  google.protobuf.Timestamp gateway_timestamp = 10;
+
+
+  common.order.OrderStatus status = 11;
+  string auction_number = 12;
+  google.protobuf.Timestamp engine_timestamp = 13;
 }
 
 service MatchingEngine {

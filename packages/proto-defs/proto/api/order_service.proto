@@ -14,21 +14,26 @@ message CreateOrderRequest {
   common.order.Side side = 4;
   common.order.OrderType type = 5;
   string user_id = 6;
+
   google.protobuf.Timestamp client_timestamp = 7;
+  google.protobuf.Timestamp gateway_timestamp = 8;
 }
 
 message CreateOrderResponse {
-  string id = 1;
-  string symbol = 2;
-  uint64 price = 3;
-  uint32 quantity = 4;
-  common.order.Side side = 5;
-  common.order.OrderType type = 6;
-  string reason = 7;
-  common.order.OrderStatus status = 8;
-  string user_id = 9;
-  google.protobuf.Timestamp client_timestamp = 10;
-  google.protobuf.Timestamp engine_timestamp = 11;
+  string symbol = 1;
+  uint64 price = 2;
+  uint32 quantity = 3;
+  common.order.Side side = 4;
+  common.order.OrderType type = 5;
+  string user_id = 6;
+
+  uint32 remaining_quantity = 7;
+  string client_order_id = 8;
+  google.protobuf.Timestamp client_timestamp = 9;
+  google.protobuf.Timestamp gateway_timestamp = 10;
+  common.order.OrderStatus status = 11;
+  string auction_number = 12;
+  google.protobuf.Timestamp engine_timestamp = 13;
 }
 
 service OrderService {
