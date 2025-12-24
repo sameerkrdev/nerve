@@ -1,5 +1,4 @@
 import * as grpc from "@grpc/grpc-js";
-import type { KafkaClient } from "@repo/kakfa-client";
 import type { Logger } from "@repo/logger";
 import type {
   MatchingEngineClient,
@@ -10,12 +9,10 @@ import type {
   CreateOrderRequest,
   CreateOrderResponse,
 } from "@repo/proto-defs/ts/api/order_service";
-import { OrderStatus as Status } from "@repo/proto-defs/ts/common/order_types";
 
 export class OrderServerController {
   constructor(
     private readonly logger: Logger,
-    private kafkaClient: KafkaClient,
     private matchingEngineClient: MatchingEngineClient,
   ) {}
 
@@ -29,19 +26,6 @@ export class OrderServerController {
     this.logger.info("Received order request", { order, orderId });
 
     try {
-      await this.kafkaClient.sendMessage<
-        CreateOrderRequest & {
-          id: string;
-          status: Status;
-          eventType: "create";
-        }
-      >("orders", {
-        id: orderId,
-        status: Status.PENDING,
-        eventType: "create",
-        ...order,
-      });
-
       const request: PlaceOrderRequest = {
         id: orderId,
         symbol: order.symbol,

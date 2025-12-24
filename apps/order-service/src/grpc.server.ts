@@ -5,33 +5,22 @@ import {
 } from "@repo/proto-defs/ts/api/order_service";
 import { type Logger } from "@repo/logger";
 import { OrderServerController } from "@/controllers/order.controller";
-import { KafkaClient, KAFKA_CLIENT_ID } from "@repo/kakfa-client";
-import env from "@/config/dotenv";
 import { MatchingEngineGrpcClient } from "./grpc.client";
 
 export class GrpcServer {
   private server: grpc.Server;
-  private kafkaCient: KafkaClient;
 
   constructor(
     private readonly logger: Logger,
     private readonly address: string,
   ) {
     this.server = new grpc.Server();
-    this.kafkaCient = new KafkaClient(
-      KAFKA_CLIENT_ID.ORDER_PRODUCER_SERVICE,
-      env.KAFKA_BROKERS.split(","),
-    );
   }
 
   initialize(): void {
     const matchingEngineClient = new MatchingEngineGrpcClient().start();
 
-    const orderController = new OrderServerController(
-      this.logger,
-      this.kafkaCient,
-      matchingEngineClient,
-    );
+    const orderController = new OrderServerController(this.logger, matchingEngineClient);
 
     // Define service implementation
     const orderServiceImpl: OrderServiceServer = {
