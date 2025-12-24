@@ -3,7 +3,7 @@ import {
   KAFKA_CONSUMER_GROUP_ID,
   KAFKA_TOPICS,
   KafkaClient,
-} from "@repo/kakfa-client";
+} from "@repo/kafka-client";
 import type { Logger } from "@repo/logger";
 import { logger } from "@repo/logger";
 import type { CreateOrderRequest } from "@repo/proto-defs/ts/api/order_service";

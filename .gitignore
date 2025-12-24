@@ -46,3 +46,4 @@ packages/proto-defs/ts/**
 packages/proto-defs/go/**
 
 **/tmp/**
+**/bin/**
