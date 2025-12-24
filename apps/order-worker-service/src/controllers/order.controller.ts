@@ -6,8 +6,8 @@ import {
 import type { Logger } from "@repo/logger";
 import { type OrderRepository } from "@repo/prisma";
 import type { OrderSide, OrderStatus, OrderType } from "@repo/prisma/";
-import type { CreateOrderRequest } from "@repo/proto-defs/ts/order_service";
-import type { Status } from "@repo/proto-defs/ts/order_service";
+import type { CreateOrderRequest } from "@repo/proto-defs/ts/api/order_service";
+import type { OrderStatus as Status } from "@repo/proto-defs/ts/common/order_types";
 
 export class OrderServerController {
   constructor(

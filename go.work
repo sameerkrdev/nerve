@@ -1,0 +1,6 @@
+go 1.25.4
+
+use (
+	./apps/matching-engine
+	./packages/proto-defs/go/generated
+)

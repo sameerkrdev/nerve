@@ -4,8 +4,8 @@
   "description": "",
   "main": "",
   "scripts": {
-    "dev": "",
-    "build": "",
+    "dev": "make post-install && make dev",
+    "build": "make post-install && make build",
     "clean": "rm -rf dist"
   },
   "keywords": [],

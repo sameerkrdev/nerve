@@ -1,0 +1,27 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/matching-engine ./cmd/matching-engine"
+bin = "tmp/matching-engine"
+
+include_ext = ["go"]
+
+include_dir = [
+  ".",
+  "../../packages/proto-defs/go/generated"
+]
+
+exclude_dir = [
+  "tmp",
+  "vendor",
+  "node_modules"
+]
+
+delay = 200
+
+[run]
+cmd = "./tmp/matching-engine"
+
+[log]
+time = true

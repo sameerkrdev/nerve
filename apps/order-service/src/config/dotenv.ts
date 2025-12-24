@@ -8,6 +8,7 @@ config({
 
 export const env = cleanEnv(process.env, {
   ORDER_SERVICE_GRPC_URL: str(),
+  MATCHING_SERVICE_GRPC_URL: str(),
 
   NODE_ENV: str({ choices: ["development", "test", "production"] }),
 

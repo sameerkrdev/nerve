@@ -1,6 +1,6 @@
 import express, { type Response, type NextFunction, type Router } from "express";
 import * as grpc from "@grpc/grpc-js";
-import { OrderServiceClient } from "@repo/proto-defs/ts/order_service";
+import { OrderServiceClient } from "@repo/proto-defs/ts/api/order_service";
 
 import { OrderController } from "@/controllers/order.controller";
 import { logger } from "@repo/logger";

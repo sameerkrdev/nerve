@@ -2,13 +2,13 @@ import { type Logger } from "@repo/logger";
 import type { Response, NextFunction } from "express";
 import type { CreateOrderRequest } from "@/types";
 import {
-  Side,
-  Type,
   type CreateOrderResponse,
   type CreateOrderRequest as GrpcCreateOrderRequest,
   type OrderServiceClient,
-} from "@repo/proto-defs/ts/order_service";
+} from "@repo/proto-defs/ts/api/order_service";
+
 import type grpc from "@grpc/grpc-js";
+import { Side, OrderType as Type } from "@repo/proto-defs/ts/common/order_types";
 
 export class OrderController {
   constructor(
@@ -18,6 +18,7 @@ export class OrderController {
 
   createOrder = (req: CreateOrderRequest, res: Response, next: NextFunction) => {
     const { symbol, price, quantity, side, type } = req.body;
+    const userId = "d8036c81-a1d7-45de-b4d8-e3847bfadd3b"; // TODO: replace with authenticated userId --> req.userId
 
     const grpcRequest: GrpcCreateOrderRequest = {
       symbol,
@@ -25,8 +26,9 @@ export class OrderController {
       quantity,
       side: Side[side as keyof typeof Side],
       type: Type[type as keyof typeof Type],
-      userId: "d8036c81-a1d7-45de-b4d8-e3847bfadd3b",
+      userId,
       clientTimestamp: new Date(),
+      gatewayTimestamp: new Date(),
     };
 
     this.grpcEngine.createOrder(
