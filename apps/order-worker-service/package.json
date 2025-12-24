@@ -29,7 +29,7 @@
     "@repo/logger": "workspace:*",
     "@repo/proto-defs": "workspace:*",
     "@repo/prisma": "workspace:*",
-    "@repo/kakfa-client": "workspace:*",
+    "@repo/kafka-client": "workspace:*",
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0"
   }

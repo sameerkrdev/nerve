@@ -297,7 +297,7 @@ importers:
       "@grpc/proto-loader":
         specifier: ^0.8.0
         version: 0.8.0
-      "@repo/kakfa-client":
+      "@repo/kafka-client":
         specifier: workspace:*
         version: link:../../packages/kafka-client
       "@repo/logger":
@@ -343,7 +343,7 @@ importers:
 
   apps/order-worker-service:
     dependencies:
-      "@repo/kakfa-client":
+      "@repo/kafka-client":
         specifier: workspace:*
         version: link:../../packages/kafka-client
       "@repo/logger":
