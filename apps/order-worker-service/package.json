@@ -1,9 +1,8 @@
 {
-  "name": "@repo/api-gateway",
+  "name": "@repo/order-worker-service",
   "version": "1.0.0",
   "description": "",
-  "main": "src/server.ts",
-  "type": "commonjs",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc -p tsconfig.json",
@@ -16,29 +15,22 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "@grpc/grpc-js": "^1.14.0",
-    "@grpc/proto-loader": "^0.8.0",
-    "@repo/clickhouse": "workspace:*",
-    "@repo/logger": "workspace:*",
-    "@repo/prisma": "workspace:*",
-    "@repo/proto-defs": "workspace:*",
-    "dotenv": "^17.2.2",
-    "envalid": "^8.1.0",
-    "express": "^5.1.0",
-    "http-errors": "^2.0.0"
-  },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/types": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@repo/validator": "workspace:*",
-    "@types/express": "^5.0.3",
-    "@types/http-errors": "^2.0.5",
     "@types/node": "^22.15.3",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@repo/logger": "workspace:*",
+    "@repo/proto-defs": "workspace:*",
+    "@repo/prisma": "workspace:*",
+    "@repo/kakfa-client": "workspace:*",
+    "dotenv": "^17.2.2",
+    "envalid": "^8.1.0"
   }
 }

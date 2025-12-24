@@ -32,6 +32,9 @@
     "infra:up": {
       "outputs": []
     },
+    "db:studio": {
+      "cache": false
+    },
     "db:generate": {
       "cache": false
     },
