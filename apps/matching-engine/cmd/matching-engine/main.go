@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	server "github.com/sameerkrdev/nerve/apps/matching-engine/internal"
+	internal "github.com/sameerkrdev/nerve/apps/matching-engine/internal"
 
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
@@ -28,9 +28,15 @@ func main() {
 	var ops []grpc.ServerOption
 	grpcServer := grpc.NewServer(ops...)
 
-	matchingEngineServer := &server.Server{}
+	matchingEngineServer := &internal.Server{}
 
 	pb.RegisterMatchingEngineServer(grpcServer, matchingEngineServer)
+
+	internal.StartActors([]string{
+		"BTCUSD",
+		"ETHUSD",
+		"SOLUSD",
+	})
 
 	log.Printf("gRPC server listening at %v", lis.Addr())
 	if err := grpcServer.Serve(lis); err != nil {

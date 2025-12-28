@@ -1,0 +1,35 @@
+package internal
+
+import "fmt"
+
+var actors = map[string]*SymbolActor{}
+
+func StartActors(symbols []string) {
+	for _, sym := range symbols {
+		actor := NewSymbolActor(sym, 8192)
+		actors[sym] = actor
+		go actor.Run()
+	}
+}
+
+func PlaceOrder(order *Order) (*AddOrderInternalResponse, error) {
+	actor, ok := actors[order.Symbol]
+	if !ok {
+		return nil, fmt.Errorf("unknown symbol %s", order.Symbol)
+	}
+
+	replyCh := make(chan *AddOrderInternalResponse, 1)
+	errCh := make(chan error, 1)
+	actor.inbox <- PlaceOrderMsg{
+		Order: order,
+		Reply: replyCh,
+		Err:   errCh,
+	}
+
+	select {
+	case res := <-replyCh:
+		return res, nil
+	case err := <-errCh:
+		return nil, fmt.Errorf("failed to process the order. Error: %v", err)
+	}
+}

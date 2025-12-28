@@ -2,9 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"log/slog"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	pbTypes "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
@@ -25,6 +22,8 @@ type Order struct {
 	GatewayTimestamp  *timestamppb.Timestamp
 	EngineTimestamp   time.Time
 
+	OrderSequence uint64
+
 	Prev *Order
 	Next *Order
 
@@ -38,8 +37,8 @@ type Order struct {
 */
 type PriceLevel struct {
 	Price       uint64
-	TotalVolume int
-	OrderCount  int
+	TotalVolume uint64
+	OrderCount  uint64
 	HeadOrder   *Order
 	TailOrder   *Order
 
@@ -50,16 +49,16 @@ type PriceLevel struct {
 func (pl *PriceLevel) Push(order *Order) {
 	order.PriceLevel = pl
 
-	if pl.HeadOrder == nil {
+	if pl.TailOrder == nil {
 		pl.HeadOrder = order
 		pl.TailOrder = order
 	} else {
-		order.Next = nil
-		order.Prev = pl.TailOrder
 		pl.TailOrder.Next = order
+		order.Prev = pl.TailOrder
+		pl.TailOrder = order
 	}
 
-	pl.TotalVolume += int(order.Quantity)
+	pl.TotalVolume += uint64(order.Quantity)
 	pl.OrderCount++
 }
 
@@ -67,18 +66,16 @@ func (pl *PriceLevel) Remove(order *Order) {
 	if order.Prev != nil {
 		order.Prev.Next = order.Next
 	} else {
-		order.Next.Prev = nil
 		pl.HeadOrder = order.Next
 	}
 
 	if order.Next != nil {
 		order.Next.Prev = order.Prev
 	} else {
-		order.Prev.Next = nil
 		pl.TailOrder = order.Prev
 	}
 
-	pl.TotalVolume -= int(order.Quantity)
+	pl.TotalVolume -= uint64(order.Quantity)
 	pl.OrderCount--
 
 	order.Prev = nil
@@ -97,7 +94,7 @@ func (pl *PriceLevel) IsEmpty() bool {
 */
 type OrderBookSide struct {
 	Side        pbTypes.Side
-	PriceLevels map[int]*PriceLevel
+	PriceLevels map[uint64]*PriceLevel
 
 	BestPriceLevel *PriceLevel
 }
@@ -105,15 +102,19 @@ type OrderBookSide struct {
 func NewOrderBookSide(side pbTypes.Side) *OrderBookSide {
 	return &OrderBookSide{
 		Side:        side,
-		PriceLevels: make(map[int]*PriceLevel),
+		PriceLevels: make(map[uint64]*PriceLevel),
 	}
 }
 
-func (obs *OrderBookSide) GetOrCreateOrderBookSide(price int) *PriceLevel {
+func (obs *OrderBookSide) IsEmpty() bool {
+	return obs.BestPriceLevel == nil
+}
+
+func (obs *OrderBookSide) GetOrCreatePriceLevel(price uint64) *PriceLevel {
 	level, exists := obs.PriceLevels[price]
 
 	if !exists {
-		level := &PriceLevel{Price: uint64(price)}
+		level = &PriceLevel{Price: uint64(price)}
 		obs.PriceLevels[price] = level
 		obs.LinkPriceLevel(level)
 	}
@@ -128,8 +129,8 @@ func (obs *OrderBookSide) LinkPriceLevel(newLevel *PriceLevel) {
 	}
 
 	currentBestPriceLevel := obs.BestPriceLevel
-	if obs.Side == pbTypes.Side_SELL {
-		// Bids: descending order (100, 99, 98...)
+	if obs.Side == pbTypes.Side_BUY {
+		// Bid: descending order (100, 99, 98...)
 		if newLevel.Price > currentBestPriceLevel.Price {
 			newLevel.NextPrice = currentBestPriceLevel
 			currentBestPriceLevel.PrevPrice = newLevel
@@ -139,11 +140,11 @@ func (obs *OrderBookSide) LinkPriceLevel(newLevel *PriceLevel) {
 		}
 
 		for currentBestPriceLevel != nil {
-			if currentBestPriceLevel.NextPrice == nil || newLevel.Price > currentBestPriceLevel.Price {
+			if currentBestPriceLevel.NextPrice == nil || newLevel.Price > currentBestPriceLevel.NextPrice.Price {
 				newLevel.PrevPrice = currentBestPriceLevel
 				newLevel.NextPrice = currentBestPriceLevel.NextPrice
 
-				if currentBestPriceLevel.NextPrice.PrevPrice != nil {
+				if currentBestPriceLevel.NextPrice != nil {
 					currentBestPriceLevel.NextPrice.PrevPrice = newLevel
 				}
 				currentBestPriceLevel.NextPrice = newLevel
@@ -161,11 +162,11 @@ func (obs *OrderBookSide) LinkPriceLevel(newLevel *PriceLevel) {
 		}
 
 		for currentBestPriceLevel != nil {
-			if currentBestPriceLevel.NextPrice == nil || newLevel.Price < currentBestPriceLevel.Price {
+			if currentBestPriceLevel.NextPrice == nil || newLevel.Price < currentBestPriceLevel.NextPrice.Price {
 				newLevel.PrevPrice = currentBestPriceLevel
 				newLevel.NextPrice = currentBestPriceLevel.NextPrice
 
-				if currentBestPriceLevel.NextPrice.PrevPrice != nil {
+				if currentBestPriceLevel.NextPrice != nil {
 					currentBestPriceLevel.NextPrice.PrevPrice = newLevel
 				}
 				currentBestPriceLevel.NextPrice = newLevel
@@ -176,10 +177,7 @@ func (obs *OrderBookSide) LinkPriceLevel(newLevel *PriceLevel) {
 	}
 }
 
-func (obs *OrderBookSide) RemovePriceLevel(level *PriceLevel) error {
-	if !level.IsEmpty() {
-		return fmt.Errorf("Failed to remove PriceLevel because it contains orders")
-	}
+func (obs *OrderBookSide) RemovePriceLevel(level *PriceLevel) {
 
 	if level.NextPrice != nil {
 		level.NextPrice.PrevPrice = level.PrevPrice
@@ -196,9 +194,7 @@ func (obs *OrderBookSide) RemovePriceLevel(level *PriceLevel) error {
 	level.NextPrice = nil
 	level.PrevPrice = nil
 
-	delete(obs.PriceLevels, int(level.Price))
-
-	return nil
+	delete(obs.PriceLevels, level.Price)
 }
 
 /*
@@ -216,55 +212,109 @@ type MatchingEngine struct {
 	TotalMatches  uint64
 	TotalVolume   uint64
 	TradeSequence uint64
-	mu            sync.RWMutex
+	OrderSequence uint64
 }
 
-func NewMatchingEnigne(symbol string) *MatchingEngine {
+func NewMatchingEngine(symbol string) *MatchingEngine {
 	return &MatchingEngine{
 		Symbol:        symbol,
-		Bids:          NewOrderBookSide(pbTypes.Side_SELL),
-		Asks:          NewOrderBookSide(pbTypes.Side_BUY),
+		Bids:          NewOrderBookSide(pbTypes.Side_BUY),
+		Asks:          NewOrderBookSide(pbTypes.Side_SELL),
 		AllOrders:     make(map[string]*Order),
 		TotalMatches:  0,
 		TotalVolume:   0,
 		TradeSequence: 0,
+		OrderSequence: 0,
 	}
 }
 
-func (me *MatchingEngine) AddOrder(order *Order) error {
-	me.mu.Lock()
-	defer me.mu.Unlock()
+type AddOrderInternalResponse struct {
+	Order  *Order
+	Trades []Trade
+}
 
+type EngineEventType uint8
+
+const (
+	EngineEventType_ORDER_ACCEPTED EngineEventType = iota
+	EngineEventType_ORDER_PARTIALLY_FILLED
+	EngineEventType_ORDER_FILLED
+	EngineEventType_ORDER_CANCELLED
+	EngineEventType_ORDER_MODIFY
+	EngineEventType_ORDER_REJECTED
+	EngineEventType_TRADE_EXECUTED
+)
+
+type EngineEvent struct {
+	Type uint8
+	Data any
+}
+
+type OrderAcceptedEvent struct {
+	Order *Order
+}
+
+type OrderRejectedEvent struct {
+	Order *Order
+}
+
+type TradeExecutedEvent struct {
+	Trade Trade
+}
+
+type OrderFilledEvent struct {
+	Order  *Order
+	Trades []Trade
+}
+
+type OrderPartiallyFilledEvent struct {
+	Order  *Order
+	Trades []Trade
+}
+
+type OrderCancelledEvent struct {
+	Order  *Order
+	Trades []Trade
+}
+
+func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalResponse, []EngineEvent, error) {
 	if _, exists := me.AllOrders[order.ClientOrderID]; exists {
-		slog.Error("Duplicate Order ID",
-			"clientOrderID", order.ClientOrderID,
-			"symbol", order.Symbol,
-			"price", order.Price,
-			"side", order.Side,
-		)
-		return fmt.Errorf("Duplicate Order ID: %s", order.ClientOrderID)
+		return nil, nil, fmt.Errorf("Duplicate Order ID: %s", order.ClientOrderID)
 	}
 
-	me.MatchOrder(order)
+	trades := me.MatchOrder(order)
 
-	if order.RemainingQuantity > 0 && order.Type != pbTypes.OrderType_MARKET {
+	if order.Type == pbTypes.OrderType_MARKET {
+		// MARKET + no liquidity → already REJECTED inside MatchOrder
+		if order.Status == pbTypes.OrderStatus_REJECTED {
+			events := me.buildEvents(order, trades)
+			return &AddOrderInternalResponse{Order: order, Trades: trades}, events, nil
+		}
+
+		// MARKET + partial fill → cancel remainder
+		if order.RemainingQuantity > 0 {
+			order.Status = pbTypes.OrderStatus_CANCELLED
+			order.RemainingQuantity = 0
+		}
+	}
+
+	if order.RemainingQuantity > 0 && order.Type == pbTypes.OrderType_LIMIT {
 		var obs *OrderBookSide
 
 		if order.Side == pbTypes.Side_BUY {
-			obs = me.Asks
-		} else {
 			obs = me.Bids
+		} else {
+			obs = me.Asks
 		}
 
-		level := obs.GetOrCreateOrderBookSide(int(order.Price))
-
-		order.Status = pbTypes.OrderStatus_PARTIAL_FILLED
+		level := obs.GetOrCreatePriceLevel(order.Price)
 
 		level.Push(order)
 		me.AllOrders[order.ClientOrderID] = order
 	}
 
-	return nil
+	events := me.buildEvents(order, trades)
+	return &AddOrderInternalResponse{Order: order, Trades: trades}, events, nil
 }
 
 func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
@@ -276,13 +326,23 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 		oppositeBook = me.Bids
 	}
 
+	// MARKET + no liquidity → reject immediately
+	if incoming.Type == pbTypes.OrderType_MARKET && oppositeBook.IsEmpty() {
+		incoming.Status = pbTypes.OrderStatus_REJECTED
+		return nil
+	}
+
+	if incoming.Type == pbTypes.OrderType_LIMIT && incoming.RemainingQuantity == incoming.Quantity {
+		incoming.Status = pbTypes.OrderStatus_OPEN
+	}
+
 	trades := []Trade{}
 
 	for incoming.RemainingQuantity > 0 && me.CanMatch(oppositeBook, incoming) {
 		bestPriceLevel := oppositeBook.BestPriceLevel
 		restingOrder := bestPriceLevel.HeadOrder
 
-		matchQuantity := min(incoming.RemainingQuantity, restingOrder.Quantity)
+		matchQuantity := min(incoming.RemainingQuantity, restingOrder.RemainingQuantity)
 		matchPrice := restingOrder.Price
 
 		trade := me.ExecuteTrade(incoming, restingOrder, matchQuantity, matchPrice)
@@ -292,17 +352,26 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 		incoming.RemainingQuantity -= matchQuantity
 		restingOrder.RemainingQuantity -= matchQuantity
 
-		atomic.AddUint64(&me.TotalMatches, 1)
-		atomic.AddUint64(&me.TotalVolume, uint64(matchQuantity))
+		me.TotalMatches++
+		me.TotalVolume += uint64(matchQuantity)
 
 		if restingOrder.RemainingQuantity == 0 {
+			restingOrder.Status = pbTypes.OrderStatus_FILLED
 			bestPriceLevel.Remove(restingOrder)
 
 			delete(me.AllOrders, restingOrder.ClientOrderID)
 
 			if bestPriceLevel.IsEmpty() {
-				oppositeBook.RemovePriceLevel(bestPriceLevel) // err handle
+
+				oppositeBook.RemovePriceLevel(bestPriceLevel)
 			}
+		}
+
+		if incoming.RemainingQuantity == 0 {
+			incoming.Status = pbTypes.OrderStatus_FILLED
+			break
+		} else {
+			incoming.Status = pbTypes.OrderStatus_PARTIAL_FILLED
 		}
 	}
 	return trades
@@ -317,9 +386,8 @@ func (me *MatchingEngine) CanMatch(oppositeBook *OrderBookSide, incoming *Order)
 	}
 
 	bestPrice := oppositeBook.BestPriceLevel.Price
-	side := oppositeBook.Side
 
-	if side == pbTypes.Side_BUY {
+	if incoming.Side == pbTypes.Side_BUY {
 		return bestPrice <= incoming.Price
 	}
 
@@ -347,9 +415,9 @@ type Trade struct {
 }
 
 func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, matchQuantity uint32, matchPrice uint64) Trade {
-	seq := atomic.AddUint64(&me.TradeSequence, 1)
+	me.TradeSequence = +1
 
-	tradeID := me.GenerateTradeID(seq)
+	tradeID := me.GenerateTradeID(me.TradeSequence)
 
 	var (
 		BuyerID     string
@@ -373,7 +441,7 @@ func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, ma
 	return Trade{
 		TradeID:       tradeID,
 		Symbol:        aggressor.Symbol,
-		TradeSequence: seq,
+		TradeSequence: me.TradeSequence,
 		Price:         matchPrice,
 		Quantity:      matchQuantity,
 		Timeline:      time.Now(),
@@ -395,8 +463,118 @@ func (me *MatchingEngine) GenerateTradeID(seq uint64) string {
 	return fmt.Sprintf("%s-T%d-%d", me.Symbol, time.Now().UnixNano(), seq)
 }
 
+func (me *MatchingEngine) buildEvents(
+	order *Order,
+	trades []Trade,
+) []EngineEvent {
+
+	events := []EngineEvent{}
+
+	// ---------- REJECT ----------
+	if order.Status == pbTypes.OrderStatus_REJECTED {
+		return []EngineEvent{
+			{
+				Type: uint8(EngineEventType_ORDER_REJECTED),
+				Data: OrderRejectedEvent{Order: order},
+			},
+		}
+	}
+
+	// ---------- ACCEPT ----------
+	events = append(events, EngineEvent{
+		Type: uint8(EngineEventType_ORDER_ACCEPTED),
+		Data: OrderAcceptedEvent{Order: order},
+	})
+
+	// ---------- TRADES ----------
+	for _, trade := range trades {
+		events = append(events, EngineEvent{
+			Type: uint8(EngineEventType_TRADE_EXECUTED),
+			Data: TradeExecutedEvent{Trade: trade},
+		})
+	}
+
+	// ---------- FINAL STATE ----------
+	switch order.Status {
+	case pbTypes.OrderStatus_FILLED:
+		events = append(events, EngineEvent{
+			Type: uint8(EngineEventType_ORDER_FILLED),
+			Data: OrderFilledEvent{Order: order, Trades: trades},
+		})
+
+	case pbTypes.OrderStatus_PARTIAL_FILLED:
+		events = append(events, EngineEvent{
+			Type: uint8(EngineEventType_ORDER_PARTIALLY_FILLED),
+			Data: OrderPartiallyFilledEvent{Order: order, Trades: trades},
+		})
+
+	case pbTypes.OrderStatus_CANCELLED:
+		events = append(events, EngineEvent{
+			Type: uint8(EngineEventType_ORDER_CANCELLED),
+			Data: OrderCancelledEvent{Order: order, Trades: trades},
+		})
+	}
+
+	return events
+}
+
 /*
 =================================================================================
 ========== Multiple Symbol Matching Engine Management via Actor Model ===========
 =================================================================================
 */
+type EngineMsg interface{}
+
+type PlaceOrderMsg struct {
+	Order *Order
+	Reply chan *AddOrderInternalResponse
+	Err   chan error
+}
+
+type CancelOrderMsg struct {
+	OrderID string
+	Reply   chan error
+}
+
+type SymbolActor struct {
+	symbol string
+	inbox  chan EngineMsg
+	engine *MatchingEngine
+}
+
+func NewSymbolActor(symbol string, buffer int) *SymbolActor {
+	return &SymbolActor{
+		symbol: symbol,
+		inbox:  make(chan EngineMsg, buffer),
+		engine: NewMatchingEngine(symbol),
+	}
+}
+
+func (a *SymbolActor) Run() {
+	for msg := range a.inbox {
+		switch m := msg.(type) {
+		case PlaceOrderMsg:
+			response, events, err := a.engine.AddOrderInternal(m.Order)
+			if err != nil {
+				m.Err <- err
+				continue
+			}
+			m.Reply <- response
+
+			a.PublishKafkaEvents(events)
+
+		case CancelOrderMsg:
+			// err := a.engine.AddOrder(m.OrderID)
+			// m.Reply <- err
+			fmt.Println("cancel order")
+
+		default:
+			panic("unknown actor message")
+		}
+
+	}
+}
+
+func (a *SymbolActor) PublishKafkaEvents(events []EngineEvent) {
+
+}

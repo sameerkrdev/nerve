@@ -2,12 +2,14 @@ package internal
 
 import (
 	"context"
-	// "log/slog"
-	"math/rand/v2"
+	"fmt"
+	"log/slog"
 	"strconv"
+
+	// "log/slog"
+
 	"time"
 
-	pbTypes "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -16,25 +18,48 @@ type Server struct {
 	pb.UnimplementedMatchingEngineServer
 }
 
-func (s *Server) PlaceOrder(ctx context.Context, in *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
+func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
 	// slog.Info("Place Order:", in)
 
-	auctionNumber := int(rand.Float64() * 1_000_000) // TODO: Use a per-symbol monotonic sequence (not random) so replay can rebuild the book.
+	order := &Order{
+		Symbol:            req.Symbol,
+		Price:             req.Price,
+		Quantity:          req.Quantity,
+		RemainingQuantity: req.Quantity,
+		Side:              req.Side,
+		Type:              req.Type,
+		ClientOrderID:     req.ClientOrderId,
+		UserID:            req.UserId,
+		GatewayTimestamp:  req.GatewayTimestamp,
+		ClientTimestamp:   req.ClientTimestamp,
+	}
+
+	res, err := PlaceOrder(order)
+
+	if err != nil {
+		slog.Error("Failed to process order",
+			"Error", err,
+			"orderId", req.ClientOrderId,
+		)
+		return nil, err
+	}
+
+	fmt.Println(res.Order, res.Trades)
 
 	return &pb.PlaceOrderResponse{
-		ClientOrderId:     in.ClientOrderId,
-		Symbol:            in.Symbol,
-		Status:            pbTypes.OrderStatus_OPEN,
-		Price:             in.Price,
-		Quantity:          in.Quantity,
-		RemainingQuantity: in.Quantity,
-		Side:              in.Side,
-		Type:              in.Type,
-		UserId:            in.UserId,
+		ClientOrderId:     res.Order.ClientOrderID,
+		Symbol:            res.Order.Symbol,
+		Status:            res.Order.Status,
+		Price:             res.Order.Price,
+		Quantity:          res.Order.Quantity,
+		RemainingQuantity: res.Order.RemainingQuantity,
+		Side:              res.Order.Side,
+		Type:              res.Order.Type,
+		UserId:            res.Order.UserID,
 
-		AuctionNumber:    strconv.Itoa(auctionNumber),
-		ClientTimestamp:  in.ClientTimestamp,
-		GatewayTimestamp: in.GatewayTimestamp,
+		AuctionNumber:    strconv.FormatUint(uint64(res.Order.OrderSequence), 10),
+		ClientTimestamp:  res.Order.ClientTimestamp,
+		GatewayTimestamp: res.Order.GatewayTimestamp,
 		EngineTimestamp:  timestamppb.New(time.Now()),
 	}, nil
 }
