@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	// "log/slog"
-
-	"time"
 
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -32,6 +31,7 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		UserID:            req.UserId,
 		GatewayTimestamp:  req.GatewayTimestamp,
 		ClientTimestamp:   req.ClientTimestamp,
+		EngineTimestamp:   timestamppb.New(time.Now()),
 	}
 
 	res, err := PlaceOrder(order)
@@ -51,8 +51,12 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		Symbol:            res.Order.Symbol,
 		Status:            res.Order.Status,
 		Price:             res.Order.Price,
+		AveragePrice:      res.Order.AveragePrice,
 		Quantity:          res.Order.Quantity,
 		RemainingQuantity: res.Order.RemainingQuantity,
+		FilledQuantity:    res.Order.FilledQuantity,
+		CancelledQuantity: res.Order.CancelledQuantity,
+		ExecutedValue:     res.Order.ExecutedValue,
 		Side:              res.Order.Side,
 		Type:              res.Order.Type,
 		UserId:            res.Order.UserID,
@@ -60,6 +64,5 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		AuctionNumber:    strconv.FormatUint(uint64(res.Order.OrderSequence), 10),
 		ClientTimestamp:  res.Order.ClientTimestamp,
 		GatewayTimestamp: res.Order.GatewayTimestamp,
-		EngineTimestamp:  timestamppb.New(time.Now()),
 	}, nil
 }

@@ -9,18 +9,25 @@ import (
 )
 
 type Order struct {
-	Symbol            string
-	Price             uint64
-	Quantity          uint32
-	RemainingQuantity uint32
+	Symbol        string
+	Price         int64
+	AveragePrice  int64
+	ExecutedValue int64
+
+	Quantity          int64
+	FilledQuantity    int64
+	RemainingQuantity int64
+	CancelledQuantity int64
 	Side              pbTypes.Side
 	Type              pbTypes.OrderType
 	UserID            string
 	ClientOrderID     string
+	ParentOrderID     string
 	Status            pbTypes.OrderStatus
+	StatusMessage     string
 	ClientTimestamp   *timestamppb.Timestamp
 	GatewayTimestamp  *timestamppb.Timestamp
-	EngineTimestamp   time.Time
+	EngineTimestamp   *timestamppb.Timestamp
 
 	OrderSequence uint64
 
@@ -36,7 +43,7 @@ type Order struct {
 ===================================================================================
 */
 type PriceLevel struct {
-	Price       uint64
+	Price       int64
 	TotalVolume uint64
 	OrderCount  uint64
 	HeadOrder   *Order
@@ -94,7 +101,7 @@ func (pl *PriceLevel) IsEmpty() bool {
 */
 type OrderBookSide struct {
 	Side        pbTypes.Side
-	PriceLevels map[uint64]*PriceLevel
+	PriceLevels map[int64]*PriceLevel
 
 	BestPriceLevel *PriceLevel
 }
@@ -102,7 +109,7 @@ type OrderBookSide struct {
 func NewOrderBookSide(side pbTypes.Side) *OrderBookSide {
 	return &OrderBookSide{
 		Side:        side,
-		PriceLevels: make(map[uint64]*PriceLevel),
+		PriceLevels: make(map[int64]*PriceLevel),
 	}
 }
 
@@ -110,11 +117,11 @@ func (obs *OrderBookSide) IsEmpty() bool {
 	return obs.BestPriceLevel == nil
 }
 
-func (obs *OrderBookSide) GetOrCreatePriceLevel(price uint64) *PriceLevel {
+func (obs *OrderBookSide) GetOrCreatePriceLevel(price int64) *PriceLevel {
 	level, exists := obs.PriceLevels[price]
 
 	if !exists {
-		level = &PriceLevel{Price: uint64(price)}
+		level = &PriceLevel{Price: int64(price)}
 		obs.PriceLevels[price] = level
 		obs.LinkPriceLevel(level)
 	}
@@ -292,9 +299,11 @@ func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalRespo
 		}
 
 		// MARKET + partial fill → cancel remainder
-		if order.RemainingQuantity > 0 {
+		if order.FilledQuantity > 0 {
 			order.Status = pbTypes.OrderStatus_CANCELLED
-			order.RemainingQuantity = 0
+
+			order.StatusMessage = "Market order partially filled; remaining quantity cancelled"
+			order.CancelledQuantity = order.RemainingQuantity
 		}
 	}
 
@@ -329,6 +338,7 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 	// MARKET + no liquidity → reject immediately
 	if incoming.Type == pbTypes.OrderType_MARKET && oppositeBook.IsEmpty() {
 		incoming.Status = pbTypes.OrderStatus_REJECTED
+		incoming.StatusMessage = "Market order rejected: no liquidity on opposite side"
 		return nil
 	}
 
@@ -342,6 +352,11 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 		bestPriceLevel := oppositeBook.BestPriceLevel
 		restingOrder := bestPriceLevel.HeadOrder
 
+		// Self-trade prevention
+		if incoming.UserID == restingOrder.UserID {
+			break // skip resting order
+		}
+
 		matchQuantity := min(incoming.RemainingQuantity, restingOrder.RemainingQuantity)
 		matchPrice := restingOrder.Price
 
@@ -351,6 +366,15 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 
 		incoming.RemainingQuantity -= matchQuantity
 		restingOrder.RemainingQuantity -= matchQuantity
+
+		incoming.FilledQuantity += matchQuantity
+		restingOrder.FilledQuantity += matchQuantity
+
+		incoming.ExecutedValue += int64(matchPrice) * int64(matchQuantity)
+		restingOrder.ExecutedValue += int64(matchPrice) * int64(matchQuantity)
+
+		incoming.AveragePrice = incoming.ExecutedValue / int64(incoming.FilledQuantity)
+		restingOrder.AveragePrice = restingOrder.ExecutedValue / int64(restingOrder.FilledQuantity)
 
 		me.TotalMatches++
 		me.TotalVolume += uint64(matchQuantity)
@@ -367,12 +391,12 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 			}
 		}
 
-		if incoming.RemainingQuantity == 0 {
-			incoming.Status = pbTypes.OrderStatus_FILLED
-			break
-		} else {
-			incoming.Status = pbTypes.OrderStatus_PARTIAL_FILLED
-		}
+	}
+
+	if incoming.RemainingQuantity == 0 {
+		incoming.Status = pbTypes.OrderStatus_FILLED
+	} else {
+		incoming.Status = pbTypes.OrderStatus_PARTIAL_FILLED
 	}
 	return trades
 }
@@ -398,8 +422,8 @@ type Trade struct {
 	TradeID       string
 	Symbol        string
 	TradeSequence uint64
-	Price         uint64
-	Quantity      uint32
+	Price         int64
+	Quantity      int64
 	Timeline      time.Time
 
 	RestingOrderID   string
@@ -414,7 +438,7 @@ type Trade struct {
 	SellOrderID string
 }
 
-func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, matchQuantity uint32, matchPrice uint64) Trade {
+func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, matchQuantity int64, matchPrice int64) Trade {
 	me.TradeSequence = +1
 
 	tradeID := me.GenerateTradeID(me.TradeSequence)
@@ -500,12 +524,6 @@ func (me *MatchingEngine) buildEvents(
 		events = append(events, EngineEvent{
 			Type: uint8(EngineEventType_ORDER_FILLED),
 			Data: OrderFilledEvent{Order: order, Trades: trades},
-		})
-
-	case pbTypes.OrderStatus_PARTIAL_FILLED:
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_ORDER_PARTIALLY_FILLED),
-			Data: OrderPartiallyFilledEvent{Order: order, Trades: trades},
 		})
 
 	case pbTypes.OrderStatus_CANCELLED:
