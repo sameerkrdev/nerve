@@ -9,8 +9,8 @@ import "common/order_types.proto";
 
 message CreateOrderRequest {
   string symbol = 1;
-  uint64 price = 2;
-  uint32 quantity = 3;
+  int64 price = 2;
+  int64 quantity = 3;
   common.order.Side side = 4;
   common.order.OrderType type = 5;
   string user_id = 6;
@@ -21,21 +21,41 @@ message CreateOrderRequest {
 
 message CreateOrderResponse {
   string symbol = 1;
-  uint64 price = 2;
-  uint32 quantity = 3;
+  int64 price = 2;
+  int64 quantity = 3;
   common.order.Side side = 4;
   common.order.OrderType type = 5;
   string user_id = 6;
 
-  uint32 remaining_quantity = 7;
-  string client_order_id = 8;
-  google.protobuf.Timestamp client_timestamp = 9;
-  google.protobuf.Timestamp gateway_timestamp = 10;
-  common.order.OrderStatus status = 11;
-  string auction_number = 12;
-  google.protobuf.Timestamp engine_timestamp = 13;
+  optional string status_message = 7;
+  int64 average_price = 8;
+  int64 executedValue = 9;
+  int64 remaining_quantity = 10;
+  int64 filled_quantity = 11;
+  int64 cancelled_quantity = 12;
+  string client_order_id = 13;
+  google.protobuf.Timestamp client_timestamp = 14;
+  google.protobuf.Timestamp gateway_timestamp = 15;
+  common.order.OrderStatus status = 16;
+  string auction_number = 17;
+  google.protobuf.Timestamp engine_timestamp = 18;
+}
+
+
+message CancelOrderRequest {
+  string id = 1;
+  string user_id = 2;
+  string symbol = 3;
+}
+
+message CancelOrderResponse {
+  string id = 1;
+  string status = 2;
+  optional string status_message = 3;
+  int64 cancelled_quantity = 4;
 }
 
 service OrderService {
   rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
 }

@@ -25,3 +25,13 @@ export const PlaceOrderValidator = z
   );
 
 export type PlaceOrder = z.infer<typeof PlaceOrderValidator>;
+
+export const CancelOrderValidator = z.object({
+  params: z.object({
+    id: z.uuid(),
+  }),
+  body: z.object({
+    symbol: z.string(),
+  }),
+});
+export type CancelOrder = z.infer<typeof CancelOrderValidator>;

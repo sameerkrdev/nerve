@@ -3,17 +3,22 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 
-	server "github.com/sameerkrdev/nerve/apps/matching-engine/internal"
+	internal "github.com/sameerkrdev/nerve/apps/matching-engine/internal"
 
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
 func main() {
 	port := 50052
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
@@ -23,9 +28,15 @@ func main() {
 	var ops []grpc.ServerOption
 	grpcServer := grpc.NewServer(ops...)
 
-	matchingEngineServer := &server.Server{}
+	matchingEngineServer := &internal.Server{}
 
 	pb.RegisterMatchingEngineServer(grpcServer, matchingEngineServer)
+
+	internal.StartActors([]string{
+		"BTCUSD",
+		"ETHUSD",
+		"SOLUSD",
+	})
 
 	log.Printf("gRPC server listening at %v", lis.Addr())
 	if err := grpcServer.Serve(lis); err != nil {

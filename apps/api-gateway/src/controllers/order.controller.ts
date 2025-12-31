@@ -1,10 +1,11 @@
 import { type Logger } from "@repo/logger";
 import type { Response, NextFunction } from "express";
-import type { CreateOrderRequest } from "@/types";
+import type { CancelOrderRequest, CreateOrderRequest } from "@/types";
 import {
   type CreateOrderResponse,
   type CreateOrderRequest as GrpcCreateOrderRequest,
   type OrderServiceClient,
+  type CancelOrderResponse,
 } from "@repo/proto-defs/ts/api/order_service";
 
 import type grpc from "@grpc/grpc-js";
@@ -38,6 +39,29 @@ export class OrderController {
 
         this.logger.info("Order placed", { response });
         res.json({ message: "Order is placed successfully", data: response });
+      },
+    );
+  };
+
+  cancelOrder = (req: CancelOrderRequest, res: Response, next: NextFunction) => {
+    const id = req.params.id;
+    const userId = "d8036c81-a1d7-45de-b4d8-e3847bfadd3b"; // TODO: replace with authenticated userId --> req.userId
+
+    const requestBody = {
+      id: id,
+      userId: userId,
+      symbol: req.body.symbol,
+    };
+
+    this.grpcEngine.cancelOrder(
+      requestBody,
+      (err: grpc.ServiceError | null, response: CancelOrderResponse) => {
+        if (err) return next(err);
+
+        this.logger.info("Order Cancelled", { response });
+        res
+          .status(200)
+          .json({ status: "success", message: "Order Cancelled Successfully", data: response });
       },
     );
   };
