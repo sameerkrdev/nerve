@@ -33,3 +33,28 @@ func PlaceOrder(order *Order) (*AddOrderInternalResponse, error) {
 		return nil, fmt.Errorf("failed to process the order. Error: %v", err)
 	}
 }
+
+func CancelOrder(id string, userID string, symbol string) (*CancelOrderInternalResponse, error) {
+	actor, ok := actors[symbol]
+	if !ok {
+		return nil, fmt.Errorf("unknown symbol %s", symbol)
+	}
+
+	replyCh := make(chan *CancelOrderInternalResponse, 1)
+	errCh := make(chan error, 1)
+
+	actor.inbox <- CancelOrderMsg{
+		ID:     id,
+		UserID: userID,
+		Symbol: symbol,
+		Reply:  replyCh,
+		Err:    errCh,
+	}
+
+	select {
+	case res := <-replyCh:
+		return res, nil
+	case err := <-errCh:
+		return nil, err
+	}
+}

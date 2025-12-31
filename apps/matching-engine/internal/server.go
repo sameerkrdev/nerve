@@ -66,3 +66,19 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		GatewayTimestamp: res.Order.GatewayTimestamp,
 	}, nil
 }
+
+func (s *Server) CancelOrder(ctx context.Context, req *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {
+
+	res, err := CancelOrder(req.Id, req.UserId, req.Symbol)
+
+	if err != nil {
+		slog.Error("Failed to cancel order")
+		return nil, err
+	}
+
+	return &pb.CancelOrderResponse{
+		Id:            res.ID,
+		Status:        res.Status,
+		StatusMessage: &res.StatusMessage,
+	}, nil
+}

@@ -304,6 +304,7 @@ func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalRespo
 
 			order.StatusMessage = "Market order partially filled; remaining quantity cancelled"
 			order.CancelledQuantity = order.RemainingQuantity
+			order.RemainingQuantity = 0
 		}
 	}
 
@@ -536,6 +537,73 @@ func (me *MatchingEngine) buildEvents(
 	return events
 }
 
+type CancelOrderInternalResponse struct {
+	ID            string
+	Status        string
+	StatusMessage string
+}
+
+func (me *MatchingEngine) CancelOrderInternal(
+	id string,
+	userID string,
+	symbol string,
+) (*CancelOrderInternalResponse, []EngineEvent, error) {
+
+	events := []EngineEvent{}
+
+	order, ok := me.AllOrders[id]
+	if !ok {
+		return nil, nil, fmt.Errorf("order not found")
+	}
+
+	// ownership check
+	if order.UserID != userID {
+		return nil, nil, fmt.Errorf("unauthorized cancel")
+	}
+
+	// already filled or already cancelled
+	if order.RemainingQuantity == 0 {
+		return nil, nil, fmt.Errorf("order already completed")
+	}
+
+	// determine book side
+	obs := me.Asks
+	if order.Side == pbTypes.Side_BUY {
+		obs = me.Bids
+	}
+
+	level, ok := obs.PriceLevels[order.Price]
+	if !ok {
+		return nil, nil, fmt.Errorf("price level not found")
+	}
+
+	// cancel remaining quantity
+	order.CancelledQuantity = order.RemainingQuantity
+	order.RemainingQuantity = 0
+	order.Status = pbTypes.OrderStatus_CANCELLED
+
+	// remove from book
+	level.Remove(order)
+	delete(me.AllOrders, order.ClientOrderID)
+
+	if level.IsEmpty() {
+		obs.RemovePriceLevel(level)
+	}
+
+	// emit fact
+	events = append(events, EngineEvent{
+		Type: uint8(EngineEventType_ORDER_CANCELLED),
+		Data: OrderCancelledEvent{
+			Order: order,
+		},
+	})
+
+	return &CancelOrderInternalResponse{
+		ID:     order.ClientOrderID,
+		Status: "ORDER_CANCELLED",
+	}, events, nil
+}
+
 /*
 =================================================================================
 ========== Multiple Symbol Matching Engine Management via Actor Model ===========
@@ -550,8 +618,11 @@ type PlaceOrderMsg struct {
 }
 
 type CancelOrderMsg struct {
-	OrderID string
-	Reply   chan error
+	ID     string
+	UserID string
+	Symbol string
+	Reply  chan *CancelOrderInternalResponse
+	Err    chan error
 }
 
 type SymbolActor struct {
@@ -582,9 +653,15 @@ func (a *SymbolActor) Run() {
 			a.PublishKafkaEvents(events)
 
 		case CancelOrderMsg:
-			// err := a.engine.AddOrder(m.OrderID)
-			// m.Reply <- err
-			fmt.Println("cancel order")
+			response, events, err := a.engine.CancelOrderInternal(m.ID, m.UserID, m.Symbol)
+
+			if err != nil {
+				m.Err <- err
+				continue
+			}
+			m.Reply <- response
+
+			a.PublishKafkaEvents(events)
 
 		default:
 			panic("unknown actor message")

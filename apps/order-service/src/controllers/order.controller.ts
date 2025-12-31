@@ -1,6 +1,8 @@
 import * as grpc from "@grpc/grpc-js";
 import type { Logger } from "@repo/logger";
 import type {
+  CancelOrderRequest,
+  CancelOrderResponse,
   MatchingEngineClient,
   PlaceOrderRequest,
   PlaceOrderResponse,
@@ -71,6 +73,58 @@ export class OrderServerController {
           code: grpc.status.INTERNAL,
           message: "Failed to place order",
           name: "CreateOrderError",
+        } as grpc.ServiceError,
+        null,
+      );
+    }
+  }
+
+  async cancelOrder(
+    call: grpc.ServerUnaryCall<CancelOrderRequest, CancelOrderResponse>,
+    callback: grpc.sendUnaryData<CancelOrderResponse>,
+  ): Promise<void> {
+    const body = call.request;
+    const requestBody = {
+      id: body.id,
+      userId: body.userId,
+      symbol: body.symbol,
+    } as CancelOrderRequest;
+
+    try {
+      const response = await new Promise<CancelOrderResponse>((resolve, reject) => {
+        this.matchingEngineClient.cancelOrder(
+          requestBody,
+          (err: grpc.ServiceError | null, res: CancelOrderResponse) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(res);
+          },
+        );
+      });
+
+      this.logger.info("Order Cancelled successfully", {
+        orderId: requestBody.id,
+        userId: requestBody.userId,
+        engineStatus: response.status,
+      });
+
+      callback(null, { ...response });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+
+      this.logger.error("Failed to cancel order", {
+        orderId: requestBody.id,
+        userId: requestBody.userId,
+        message: err.message,
+        stack: err.stack,
+      });
+
+      callback(
+        {
+          code: grpc.status.INTERNAL,
+          message: "Failed to cancel order",
+          name: "CancelOrderError",
         } as grpc.ServiceError,
         null,
       );

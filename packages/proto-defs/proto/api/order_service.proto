@@ -41,6 +41,21 @@ message CreateOrderResponse {
   google.protobuf.Timestamp engine_timestamp = 18;
 }
 
+
+message CancelOrderRequest {
+  string id = 1;
+  string user_id = 2;
+  string symbol = 3;
+}
+
+message CancelOrderResponse {
+  string id = 1;
+  string status = 2;
+  optional string status_message = 3;
+  int64 cancelled_quantity = 4;
+}
+
 service OrderService {
   rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
 }
