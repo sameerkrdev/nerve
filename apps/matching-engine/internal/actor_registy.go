@@ -58,3 +58,38 @@ func CancelOrder(id string, userID string, symbol string) (*CancelOrderInternalR
 		return nil, err
 	}
 }
+
+func ModifyOrder(
+	symbol string,
+	orderID string,
+	userID string,
+	clientModifyID string,
+	newPrice *int64,
+	newQuantity *int64,
+) (*ModifyOrderInternalResponse, error) {
+	actor, ok := actors[symbol]
+	if !ok {
+		return nil, fmt.Errorf("unknown symbol %s", symbol)
+	}
+
+	replyCh := make(chan *ModifyOrderInternalResponse, 1)
+	errCh := make(chan error, 1)
+
+	actor.inbox <- ModifyOrderMsg{
+		Symbol:         symbol,
+		OrderID:        orderID,
+		UserID:         userID,
+		ClientModifyID: clientModifyID,
+		NewPrice:       newPrice,
+		NewQuantity:    newQuantity,
+		Reply:          replyCh,
+		Err:            errCh,
+	}
+
+	select {
+	case res := <-replyCh:
+		return res, nil
+	case err := <-errCh:
+		return nil, err
+	}
+}

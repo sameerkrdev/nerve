@@ -1,15 +1,21 @@
 import * as grpc from "@grpc/grpc-js";
 import type { Logger } from "@repo/logger";
 import type {
-  CancelOrderRequest,
-  CancelOrderResponse,
   MatchingEngineClient,
   PlaceOrderRequest,
   PlaceOrderResponse,
+  CancelOrderRequest as ServerCancelOrderRequest,
+  CancelOrderResponse as ServerCancelOrderResponse,
+  ModifyOrderRequest as ServerModifyOrderRequest,
+  ModifyOrderResponse as ServerModifyOrderResponse,
 } from "@repo/proto-defs/ts/engine/order_matching";
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
+  CancelOrderRequest,
+  CancelOrderResponse,
+  ModifyOrderRequest,
+  ModifyOrderResponse,
 } from "@repo/proto-defs/ts/api/order_service";
 
 export class OrderServerController {
@@ -84,17 +90,18 @@ export class OrderServerController {
     callback: grpc.sendUnaryData<CancelOrderResponse>,
   ): Promise<void> {
     const body = call.request;
+
     const requestBody = {
       id: body.id,
       userId: body.userId,
       symbol: body.symbol,
-    } as CancelOrderRequest;
+    } as ServerCancelOrderRequest;
 
     try {
-      const response = await new Promise<CancelOrderResponse>((resolve, reject) => {
+      const response = await new Promise<ServerCancelOrderResponse>((resolve, reject) => {
         this.matchingEngineClient.cancelOrder(
           requestBody,
-          (err: grpc.ServiceError | null, res: CancelOrderResponse) => {
+          (err: grpc.ServiceError | null, res: ServerCancelOrderResponse) => {
             if (err) {
               return reject(err);
             }
@@ -103,11 +110,7 @@ export class OrderServerController {
         );
       });
 
-      this.logger.info("Order Cancelled successfully", {
-        orderId: requestBody.id,
-        userId: requestBody.userId,
-        engineStatus: response.status,
-      });
+      this.logger.info("Order Cancelled successfully", { ...response });
 
       callback(null, { ...response });
     } catch (error) {
@@ -125,6 +128,62 @@ export class OrderServerController {
           code: grpc.status.INTERNAL,
           message: "Failed to cancel order",
           name: "CancelOrderError",
+        } as grpc.ServiceError,
+        null,
+      );
+    }
+  }
+
+  async modifyOrder(
+    call: grpc.ServerUnaryCall<ModifyOrderRequest, ModifyOrderResponse>,
+    callback: grpc.sendUnaryData<ModifyOrderResponse>,
+  ): Promise<void> {
+    const { orderId, userId, symbol, newPrice, newQuantity } = call.request;
+    const clientModifyId = crypto.randomUUID();
+
+    const requestBody = {
+      orderId,
+      userId,
+      symbol,
+      newPrice,
+      newQuantity,
+      clientModifyId,
+    } as ServerModifyOrderRequest;
+
+    try {
+      const response = await new Promise<ServerModifyOrderResponse>((resolve, reject) => {
+        this.matchingEngineClient.modifyOrder(
+          requestBody,
+          (err: grpc.ServiceError | null, res: ServerModifyOrderResponse) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(res);
+          },
+        );
+      });
+
+      this.logger.info("Order Cancelled successfully", {
+        ...response,
+        engineStatus: response.status,
+      });
+
+      callback(null, { ...response });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+
+      this.logger.error("Failed to modify order", {
+        orderId: requestBody.orderId,
+        userId: requestBody.userId,
+        message: err.message,
+        stack: err.stack,
+      });
+
+      callback(
+        {
+          code: grpc.status.INTERNAL,
+          message: "Failed to modify order",
+          name: "ModifyOrderError",
         } as grpc.ServiceError,
         null,
       );

@@ -82,3 +82,21 @@ func (s *Server) CancelOrder(ctx context.Context, req *pb.CancelOrderRequest) (*
 		StatusMessage: &res.StatusMessage,
 	}, nil
 }
+
+func (s *Server) ModifyOrder(ctx context.Context, req *pb.ModifyOrderRequest) (*pb.ModifyOrderResponse, error) {
+
+	res, err := ModifyOrder(req.Symbol, req.OrderId, req.UserId, req.ClientModifyId, req.NewPrice, req.NewQuantity)
+
+	if err != nil {
+		slog.Error("Failed to cancel order")
+		return nil, err
+	}
+
+	return &pb.ModifyOrderResponse{
+		OrderId:       res.OrderID,
+		OldOrderId:    res.OldOrderId,
+		NewOrderId:    res.NewOrderId,
+		Status:        res.Status,
+		StatusMessage: res.StatusMessage,
+	}, nil
+}

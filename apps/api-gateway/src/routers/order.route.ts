@@ -4,8 +4,8 @@ import { OrderServiceClient } from "@repo/proto-defs/ts/api/order_service";
 
 import { OrderController } from "@/controllers/order.controller";
 import { logger } from "@repo/logger";
-import type { CancelOrderRequest, CreateOrderRequest } from "@/types";
-import { PlaceOrderValidator, CancelOrderValidator } from "@repo/validator";
+import type { CancelOrderRequest, CreateOrderRequest, ModifyOrderRequest } from "@/types";
+import { PlaceOrderValidator, CancelOrderValidator, ModifyOrderValidator } from "@repo/validator";
 import zodValidatorMiddleware from "@/middlewares/zod.validator.middleware";
 import env from "@/config/dotenv";
 
@@ -38,6 +38,13 @@ router.post(
   zodValidatorMiddleware(CancelOrderValidator),
   (req: CancelOrderRequest, res: Response, next: NextFunction) =>
     orderController.cancelOrder(req, res, next),
+);
+
+router.post(
+  "/:id",
+  zodValidatorMiddleware(ModifyOrderValidator),
+  (req: ModifyOrderRequest, res: Response, next: NextFunction) =>
+    orderController.modifyOrder(req, res, next),
 );
 
 export default router;
