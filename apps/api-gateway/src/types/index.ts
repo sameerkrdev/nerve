@@ -1,6 +1,6 @@
 import type { Request } from "express";
 import type { Trade, User } from "@repo/types";
-import type { PlaceOrder, CancelOrder } from "@repo/validator";
+import type { PlaceOrder, CancelOrder, ModifyOrder } from "@repo/validator";
 
 export interface CreateTradeRequest extends Request {
   body: Trade;
@@ -53,4 +53,9 @@ export interface CreateOrderRequest extends Request {
 export interface CancelOrderRequest extends Request {
   params: CancelOrder["params"];
   body: CancelOrder["body"];
+}
+
+export interface ModifyOrderRequest extends Request {
+  params: ModifyOrder["params"];
+  body: ModifyOrder["body"];
 }

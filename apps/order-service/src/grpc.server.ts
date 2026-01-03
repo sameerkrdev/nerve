@@ -26,6 +26,7 @@ export class GrpcServer {
     const orderServiceImpl: OrderServiceServer = {
       createOrder: orderController.placeOrder.bind(orderController),
       cancelOrder: orderController.cancelOrder.bind(orderController),
+      modifyOrder: orderController.modifyOrder.bind(orderController),
     };
 
     // Add service to server

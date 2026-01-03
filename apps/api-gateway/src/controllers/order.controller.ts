@@ -1,11 +1,14 @@
 import { type Logger } from "@repo/logger";
 import type { Response, NextFunction } from "express";
-import type { CancelOrderRequest, CreateOrderRequest } from "@/types";
+import type { CancelOrderRequest, CreateOrderRequest, ModifyOrderRequest } from "@/types";
 import {
+  type OrderServiceClient,
   type CreateOrderResponse,
   type CreateOrderRequest as GrpcCreateOrderRequest,
-  type OrderServiceClient,
   type CancelOrderResponse,
+  type CancelOrderRequest as GrpcCancelOrderRequest,
+  type ModifyOrderResponse,
+  type ModifyOrderRequest as GrpcModifyOrderRequest,
 } from "@repo/proto-defs/ts/api/order_service";
 
 import type grpc from "@grpc/grpc-js";
@@ -47,7 +50,7 @@ export class OrderController {
     const id = req.params.id;
     const userId = "d8036c81-a1d7-45de-b4d8-e3847bfadd3b"; // TODO: replace with authenticated userId --> req.userId
 
-    const requestBody = {
+    const requestBody: GrpcCancelOrderRequest = {
       id: id,
       userId: userId,
       symbol: req.body.symbol,
@@ -62,6 +65,35 @@ export class OrderController {
         res
           .status(200)
           .json({ status: "success", message: "Order Cancelled Successfully", data: response });
+      },
+    );
+  };
+
+  modifyOrder = (req: ModifyOrderRequest, res: Response, next: NextFunction) => {
+    const orderId = req.params.id;
+    const userId = "d8036c81-a1d7-45de-b4d8-e3847bfadd3b"; // TODO: replace with authenticated userId --> req.userId
+
+    const { symbol, newPrice, newQuantity } = req.body;
+    const requestBody: GrpcModifyOrderRequest = {
+      orderId,
+      userId,
+      symbol,
+      newPrice,
+      newQuantity,
+    };
+
+    this.grpcEngine.modifyOrder(
+      requestBody,
+      (err: grpc.ServiceError | null, response: ModifyOrderResponse) => {
+        if (err) return next(err);
+
+        this.logger.info("Order Modified", response);
+
+        res.status(200).json({
+          status: "success",
+          message: "Order is modified successfully",
+          data: response,
+        });
       },
     );
   };

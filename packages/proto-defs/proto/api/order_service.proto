@@ -55,7 +55,27 @@ message CancelOrderResponse {
   int64 cancelled_quantity = 4;
 }
 
+message ModifyOrderRequest {
+  string order_id = 1;
+  string user_id = 2;
+  string symbol = 3;
+
+  optional int64 new_quantity = 4;
+  optional int64 new_price = 5;
+}
+
+message ModifyOrderResponse {
+  string order_id = 1;
+
+  string old_order_id = 2;
+  string new_order_id = 3;
+
+  string status = 4;
+  string status_message = 5;
+}
+
 service OrderService {
   rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
   rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc ModifyOrder(ModifyOrderRequest) returns (ModifyOrderResponse);
 }

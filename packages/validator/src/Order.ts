@@ -35,3 +35,27 @@ export const CancelOrderValidator = z.object({
   }),
 });
 export type CancelOrder = z.infer<typeof CancelOrderValidator>;
+
+export const ModifyOrderValidator = z.object({
+  params: z.object({
+    id: z.uuid(),
+  }),
+
+  body: z
+    .object({
+      symbol: z.string().trim(),
+
+      newPrice: z.number().positive().optional(),
+      newQuantity: z.number().int().positive().optional(),
+    })
+    .refine(
+      (data) => {
+        return data.newPrice !== undefined || data.newQuantity !== undefined;
+      },
+      {
+        message: "At least one of newPrice or newQuantity must be provided",
+        path: ["body"],
+      },
+    ),
+});
+export type ModifyOrder = z.infer<typeof ModifyOrderValidator>;
