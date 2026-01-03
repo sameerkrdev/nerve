@@ -2,12 +2,31 @@ package internal
 
 import "fmt"
 
+type Symbol struct {
+	Name            string
+	StartingPrice   int64
+	MaxWalFileSize  int
+	WalDir          string
+	WalSyncInterval int
+	WalShouldFsync  bool
+}
+
 var actors = map[string]*SymbolActor{}
 
-func StartActors(symbols []string) {
+func StartActors(symbols []Symbol) {
 	for _, sym := range symbols {
 		actor := NewSymbolActor(sym, 8192)
-		actors[sym] = actor
+		actors[sym.Name] = actor
+
+		// 1. Load snapshot (if exists)
+		// 2. Replay WAL (blocking)
+
+		// 3. Start other workers owned by actor
+		go actor.wal.keepSyncing()
+		// go actor.kafkaEmitter()
+		// go actor.snapshotWorker()
+
+		// 4. Start actor loop LAST
 		go actor.Run()
 	}
 }

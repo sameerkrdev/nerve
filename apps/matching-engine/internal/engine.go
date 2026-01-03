@@ -800,14 +800,13 @@ type SymbolActor struct {
 	wal *SymbolWAL
 }
 
-func NewSymbolActor(symbol string, buffer int) *SymbolActor {
-
-	wal, _ := OpenWAL("wal", symbol, 67_108_864, true, 500)
+func NewSymbolActor(symbol Symbol, buffer int) *SymbolActor {
+	wal, _ := OpenWAL(symbol.WalDir, symbol.Name, int64(symbol.MaxWalFileSize), symbol.WalShouldFsync, symbol.WalSyncInterval)
 
 	return &SymbolActor{
-		symbol: symbol,
+		symbol: symbol.Name,
 		inbox:  make(chan EngineMsg, buffer),
-		engine: NewMatchingEngine(symbol),
+		engine: NewMatchingEngine(symbol.Name),
 		wal:    wal,
 	}
 }

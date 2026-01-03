@@ -119,7 +119,7 @@ func OpenWAL(dir string, symbol string, maxFileSize int64, enableFsync bool, syn
 	}
 	wal.nextOffset = offset + 1
 
-	go wal.keepSyncing()
+	// go wal.keepSyncing()
 	return wal, nil
 }
 
