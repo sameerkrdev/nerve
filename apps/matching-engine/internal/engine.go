@@ -208,6 +208,7 @@ func (obs *OrderBookSide) RemovePriceLevel(level *PriceLevel) {
 ================== Single Symbol Matching Engine Management =====================
 =================================================================================
 */
+
 type MatchingEngine struct {
 	Symbol string
 	Bids   *OrderBookSide
@@ -795,13 +796,19 @@ type SymbolActor struct {
 	symbol string
 	inbox  chan EngineMsg
 	engine *MatchingEngine
+
+	wal *SymbolWAL
 }
 
 func NewSymbolActor(symbol string, buffer int) *SymbolActor {
+
+	wal, _ := OpenWAL("wal", symbol, 67_108_864, true, 500)
+
 	return &SymbolActor{
 		symbol: symbol,
 		inbox:  make(chan EngineMsg, buffer),
 		engine: NewMatchingEngine(symbol),
+		wal:    wal,
 	}
 }
 
