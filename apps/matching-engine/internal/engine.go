@@ -620,26 +620,26 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	newOrderID string, // required ONLY for replace
 	newPrice *int64,
 	newQuantity *int64,
-) ([]EngineEvent, error) {
+) (*ModifyOrderInternalResponse, []EngineEvent, error) {
 
 	order, ok := me.AllOrders[oldOrderID]
 	if !ok {
-		return nil, fmt.Errorf("order not found")
+		return nil, nil, fmt.Errorf("order not found")
 	}
 	if order.UserID != userID {
-		return nil, fmt.Errorf("unauthorized")
+		return nil, nil, fmt.Errorf("unauthorized")
 	}
 	if order.Symbol != symbol {
-		return nil, fmt.Errorf("symbol mismatch")
+		return nil, nil, fmt.Errorf("symbol mismatch")
 	}
 	if order.Status == pbTypes.OrderStatus_FILLED || order.Status == pbTypes.OrderStatus_CANCELLED {
-		return nil, fmt.Errorf("order not modifiable")
+		return nil, nil, fmt.Errorf("order not modifiable")
 	}
 
 	executed := order.Quantity - order.RemainingQuantity
 
 	if newQuantity != nil && *newQuantity < executed {
-		return nil, fmt.Errorf("new quantity < executed quantity")
+		return nil, nil, fmt.Errorf("new quantity < executed quantity")
 	}
 
 	newRemaining := order.RemainingQuantity
@@ -654,15 +654,28 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	switch {
 	case priceChanged || qtyIncreased:
 		if _, exists := me.AllOrders[newOrderID]; exists {
-			return nil, fmt.Errorf("new_order_id already exists")
+			return nil, nil, fmt.Errorf("new_order_id already exists")
 		}
-		return me.replaceOrder(order, newOrderID, newPrice, newQuantity)
+		events, err := me.replaceOrder(order, newOrderID, newPrice, newQuantity)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		response := &ModifyOrderInternalResponse{OrderID: order.ClientOrderID, OldOrderId: order.ClientOrderID, NewOrderId: newOrderID, Status: "Success"}
+		return response, events, nil
 
 	case qtyReduced:
-		return me.reduceOrder(order, newQuantity)
+
+		events, err := me.reduceOrder(order, newQuantity)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		response := &ModifyOrderInternalResponse{OrderID: order.ClientOrderID, OldOrderId: "", NewOrderId: "", Status: "Success"}
+		return response, events, nil
 
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 }
 
@@ -684,6 +697,11 @@ func (me *MatchingEngine) reduceOrder(
 
 	order.Quantity = *newQuantity
 	order.RemainingQuantity = newRemaining
+
+	if order.PriceLevel != nil {
+		volumeDelta := order.RemainingQuantity - newRemaining
+		order.PriceLevel.TotalVolume -= uint64(volumeDelta)
+	}
 
 	// snapshot update (NO semantic meaning here)
 	return []EngineEvent{
@@ -712,6 +730,7 @@ func (me *MatchingEngine) replaceOrder(
 ) ([]EngineEvent, error) {
 
 	var events []EngineEvent
+	executed := order.Quantity - order.RemainingQuantity
 
 	// ---------- cancel old ----------
 	_, cancelEvents, err := me.CancelOrderInternal(
@@ -723,8 +742,6 @@ func (me *MatchingEngine) replaceOrder(
 		return nil, err
 	}
 	events = append(events, cancelEvents...)
-
-	executed := order.Quantity - order.RemainingQuantity
 
 	price := order.Price
 	if newPrice != nil {
@@ -835,13 +852,13 @@ func (a *SymbolActor) Run() {
 
 			a.PublishKafkaEvents(events)
 		case ModifyOrderMsg:
-			events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
+			response, events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
 
 			if err != nil {
 				m.Err <- err
 				continue
 			}
-			// m.Reply <- response
+			m.Reply <- response
 
 			a.PublishKafkaEvents(events)
 
