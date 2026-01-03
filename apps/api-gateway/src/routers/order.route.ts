@@ -33,7 +33,7 @@ router.post(
     orderController.createOrder(req, res, next),
 );
 
-router.post(
+router.delete(
   "/:id",
   zodValidatorMiddleware(CancelOrderValidator),
   (req: CancelOrderRequest, res: Response, next: NextFunction) =>
