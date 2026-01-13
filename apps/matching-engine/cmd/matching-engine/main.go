@@ -33,9 +33,9 @@ func main() {
 	pb.RegisterMatchingEngineServer(grpcServer, matchingEngineServer)
 
 	symbols := []internal.Symbol{
-		{Name: "BTCUSD", StartingPrice: 900_000, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 500, WalShouldFsync: true},
-		{Name: "SOLUSD", StartingPrice: 150, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 500, WalShouldFsync: true},
-		{Name: "ETHUSD", StartingPrice: 3_510, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 500, WalShouldFsync: true},
+		{Name: "BTCUSD", StartingPrice: 90_000, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 400, WalShouldFsync: true, KafkaBatchSize: 300, KafkaEmitMM: 200},
+		{Name: "SOLUSD", StartingPrice: 150, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 400, WalShouldFsync: true, KafkaBatchSize: 300, KafkaEmitMM: 200},
+		{Name: "ETHUSD", StartingPrice: 3_510, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 400, WalShouldFsync: true, KafkaBatchSize: 300, KafkaEmitMM: 200},
 	}
 
 	internal.StartActors(symbols)

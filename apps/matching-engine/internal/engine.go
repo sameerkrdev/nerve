@@ -814,18 +814,34 @@ type SymbolActor struct {
 	inbox  chan EngineMsg
 	engine *MatchingEngine
 
-	wal *SymbolWAL
+	wal          *SymbolWAL
+	kafkaEmitter *KafkaProducerWorker
 }
 
-func NewSymbolActor(symbol Symbol, buffer int) *SymbolActor {
-	wal, _ := OpenWAL(symbol.WalDir, symbol.Name, int64(symbol.MaxWalFileSize), symbol.WalShouldFsync, symbol.WalSyncInterval)
+func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
+	wal, err := OpenWAL(symbol.WalDir, symbol.Name, int64(symbol.MaxWalFileSize), symbol.WalShouldFsync, symbol.WalSyncInterval)
+	if err != nil {
+		return nil, err
+	}
+
+	kakfaWoker, err := NewKafkaProducerWorker(
+		symbol.Name,
+		symbol.WalDir,
+		wal,
+		symbol.KafkaBatchSize,
+		symbol.KafkaEmitMM,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &SymbolActor{
-		symbol: symbol.Name,
-		inbox:  make(chan EngineMsg, buffer),
-		engine: NewMatchingEngine(symbol.Name),
-		wal:    wal,
-	}
+		symbol:       symbol.Name,
+		inbox:        make(chan EngineMsg, buffer),
+		engine:       NewMatchingEngine(symbol.Name),
+		wal:          wal,
+		kafkaEmitter: kakfaWoker,
+	}, nil
 }
 
 func (a *SymbolActor) Run() {

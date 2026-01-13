@@ -1,6 +1,9 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 type Symbol struct {
 	Name            string
@@ -9,13 +12,18 @@ type Symbol struct {
 	WalDir          string
 	WalSyncInterval int
 	WalShouldFsync  bool
+	KafkaBatchSize  int
+	KafkaEmitMM     int
 }
 
 var actors = map[string]*SymbolActor{}
 
 func StartActors(symbols []Symbol) {
 	for _, sym := range symbols {
-		actor := NewSymbolActor(sym, 8192)
+		actor, err := NewSymbolActor(sym, 8192)
+		if err != nil {
+			log.Fatalln("Failed to start actor", symbols)
+		}
 		actors[sym.Name] = actor
 
 		// 1. Load snapshot (if exists)
@@ -23,7 +31,7 @@ func StartActors(symbols []Symbol) {
 
 		// 3. Start other workers owned by actor
 		go actor.wal.keepSyncing()
-		// go actor.kafkaEmitter()
+		go actor.kafkaEmitter.Run()
 		// go actor.snapshotWorker()
 
 		// 4. Start actor loop LAST

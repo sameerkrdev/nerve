@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,11 +39,14 @@ type SymbolWAL struct {
 
 	syncTimer *time.Timer
 
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	mu sync.Mutex
 }
 
 func OpenWAL(dir string, symbol string, maxFileSize int64, enableFsync bool, syncIntervalMM int) (*SymbolWAL, error) {
-	dirPath := dir + "/" + symbol + "_wal"
+	dirPath := filepath.Join(dir, symbol)
 	if err := os.Mkdir(dirPath, 0755); err != nil {
 		return nil, err
 	}
@@ -73,7 +78,6 @@ func OpenWAL(dir string, symbol string, maxFileSize int64, enableFsync bool, syn
 			if index > lastSegmentIndex {
 				lastSegmentIndex = index
 			}
-
 		}
 	} else {
 		filePath := filepath.Join(dirPath, fmt.Sprintf("%d.log", 0))
@@ -99,6 +103,7 @@ func OpenWAL(dir string, symbol string, maxFileSize int64, enableFsync bool, syn
 	if _, err = file.Seek(0, io.SeekEnd); err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 
 	wal := &SymbolWAL{
 		dirPath:             dirPath,
@@ -111,9 +116,11 @@ func OpenWAL(dir string, symbol string, maxFileSize int64, enableFsync bool, syn
 		syncTimer:           time.NewTimer(time.Duration(syncIntervalMM) * time.Millisecond),
 		nextOffset:          0,
 		syncIntervalMM:      syncIntervalMM,
+		ctx:                 ctx,
+		cancel:              cancel,
 	}
 
-	offset, err := wal.findLastSequenceNumber()
+	offset, err := wal.findLastSequenceNumber(file.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +186,7 @@ func (sw *SymbolWAL) rotateFile() error {
 			return err
 		}
 
-		filePath := fmt.Sprintf("%s/%d.log", sw.dirPath, sw.currentSegmentIndex+1)
+		filePath := filepath.Join(sw.dirPath, fmt.Sprintf("%v", sw.currentSegmentIndex+1))
 
 		file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -229,8 +236,8 @@ func (sw *SymbolWAL) keepSyncing() {
 	}
 }
 
-func (sw *SymbolWAL) findLastSequenceNumber() (uint64, error) {
-	entry, err := sw.findLastEntryInLog()
+func (sw *SymbolWAL) findLastSequenceNumber(filename string) (uint64, error) {
+	entry, err := sw.findLastEntryInLog(filename)
 	if err != nil {
 		return 0, err
 	}
@@ -242,8 +249,8 @@ func (sw *SymbolWAL) findLastSequenceNumber() (uint64, error) {
 	return 0, nil
 }
 
-func (sw *SymbolWAL) findLastEntryInLog() (*pbTypes.WAL_Entry, error) {
-	file, err := os.OpenFile(filepath.Join(sw.dirPath, sw.currentSegmentFile.Name()), os.O_RDONLY, 0644)
+func (sw *SymbolWAL) findLastEntryInLog(filename string) (*pbTypes.WAL_Entry, error) {
+	file, err := os.OpenFile(filepath.Join(sw.dirPath, filename), os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +308,74 @@ func (sw *SymbolWAL) findLastEntryInLog() (*pbTypes.WAL_Entry, error) {
 			return nil, err
 		}
 	}
+}
+
+func (sw *SymbolWAL) ReadFromTo(from, to uint64) ([]*pbTypes.WAL_Entry, error) {
+	if from > to {
+		return nil, fmt.Errorf("invalid range: from > to")
+	}
+
+	entries, err := os.ReadDir(sw.dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	results := make([]*pbTypes.WAL_Entry, 0, to-from+1)
+
+	for _, dirEntry := range entries {
+		if dirEntry.IsDir() {
+			continue
+		}
+
+		path := filepath.Join(sw.dirPath, dirEntry.Name())
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		for {
+			var size uint32
+			if err := binary.Read(file, binary.LittleEndian, &size); err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, err
+			}
+
+			if size == 0 {
+				return nil, fmt.Errorf("invalid WAL record size")
+			}
+
+			data := make([]byte, size)
+			if _, err := io.ReadFull(file, data); err != nil {
+				return nil, err
+			}
+
+			entry, err := unmarshalAndVerifyEntry(data)
+			if err != nil {
+				return nil, err
+			}
+
+			seq := entry.GetSequenceNumber()
+
+			if seq < from {
+				continue
+			}
+
+			if seq > to {
+				return results, nil
+			}
+
+			results = append(results, entry)
+		}
+	}
+
+	return results, nil
 }
 
 func unmarshalAndVerifyEntry(data []byte) (*pbTypes.WAL_Entry, error) {
