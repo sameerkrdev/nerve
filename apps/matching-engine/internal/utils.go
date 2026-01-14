@@ -1,0 +1,79 @@
+package internal
+
+import (
+	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
+	"google.golang.org/protobuf/proto"
+)
+
+func StrPtr(s string) *string {
+	return &s
+}
+
+func EncodeOrderStatusEvent(order *Order, statusMessage *string) ([]byte, error) {
+	eventByte, err := proto.Marshal(&pb.OrderStatusEvent{
+		OrderId:           order.ClientOrderID,
+		UserId:            order.UserID,
+		Symbol:            order.Symbol,
+		Status:            order.Status,
+		StatusMessage:     statusMessage,
+		FilledQuantity:    order.FilledQuantity,
+		RemainingQuantity: order.RemainingQuantity,
+		CancelledQuantity: order.CancelledQuantity,
+		AveragePrice:      order.AveragePrice,
+		GatewayTimestamp:  order.GatewayTimestamp,
+		ClientTimestamp:   order.ClientTimestamp,
+		EngineTimestamp:   order.EngineTimestamp,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return eventByte, nil
+}
+
+func EncodeOrderReducedEvent(order *Order, oldQuantity int64, oldRemainingQuantiy int64) ([]byte, error) {
+	eventByte, err := proto.Marshal(&pb.OrderReducedEvent{
+		Order: &pb.OrderStatusEvent{OrderId: order.ClientOrderID,
+			UserId:            order.UserID,
+			Symbol:            order.Symbol,
+			Status:            order.Status,
+			FilledQuantity:    order.FilledQuantity,
+			RemainingQuantity: order.RemainingQuantity,
+			CancelledQuantity: order.CancelledQuantity,
+			AveragePrice:      order.AveragePrice,
+			GatewayTimestamp:  order.GatewayTimestamp,
+			ClientTimestamp:   order.ClientTimestamp,
+			EngineTimestamp:   order.EngineTimestamp,
+		},
+		OldQuantity:          oldQuantity,
+		NewQuantity:          order.Quantity,
+		OldRemainingQuantity: oldRemainingQuantiy,
+		NewRemainingQuantity: order.RemainingQuantity,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return eventByte, nil
+}
+
+func EncodeTradeEvent(trade *Trade) ([]byte, error) {
+	eventByte, err := proto.Marshal(&pb.TradeEvent{
+		TradeId:       trade.TradeID,
+		Symbol:        trade.Symbol,
+		TradeSequence: trade.TradeSequence,
+		Price:         trade.Price,
+		Quantity:      trade.Quantity,
+		BuyerId:       trade.BuyOrderID,
+		SellerId:      trade.SellerID,
+		BuyOrderId:    trade.BuyOrderID,
+		SellOrderId:   trade.SellOrderID,
+		IsBuyerMaker:  trade.IsBuyerMaker,
+		Timestamp:     trade.Timeline,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return eventByte, nil
+}

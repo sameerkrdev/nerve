@@ -5,6 +5,8 @@ import (
 	"time"
 
 	pbTypes "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
+	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -27,8 +29,6 @@ type Order struct {
 	ClientTimestamp   *timestamppb.Timestamp
 	GatewayTimestamp  *timestamppb.Timestamp
 	EngineTimestamp   *timestamppb.Timestamp
-
-	OrderSequence uint64
 
 	Prev *Order
 	Next *Order
@@ -220,9 +220,11 @@ type MatchingEngine struct {
 	TotalVolume   uint64
 	TradeSequence uint64
 	OrderSequence uint64
+
+	wal *SymbolWAL
 }
 
-func NewMatchingEngine(symbol string) *MatchingEngine {
+func NewMatchingEngine(symbol string, wal *SymbolWAL) *MatchingEngine {
 	return &MatchingEngine{
 		Symbol:        symbol,
 		Bids:          NewOrderBookSide(pbTypes.Side_BUY),
@@ -232,6 +234,7 @@ func NewMatchingEngine(symbol string) *MatchingEngine {
 		TotalVolume:   0,
 		TradeSequence: 0,
 		OrderSequence: 0,
+		wal:           wal,
 	}
 }
 
@@ -240,52 +243,7 @@ type AddOrderInternalResponse struct {
 	Trades []Trade
 }
 
-type EngineEventType uint8
-
-const (
-	EngineEventType_ORDER_ACCEPTED EngineEventType = iota
-	EngineEventType_ORDER_PARTIALLY_FILLED
-	EngineEventType_ORDER_FILLED
-	EngineEventType_ORDER_CANCELLED
-	EngineEventType_ORDER_MODIFY
-	EngineEventType_ORDER_REJECTED
-	EngineEventType_TRADE_EXECUTED
-	EngineEventType_ORDER_UPDATED
-)
-
-type EngineEvent struct {
-	Type uint8
-	Data any
-}
-
-type OrderAcceptedEvent struct {
-	Order *Order
-}
-
-type OrderRejectedEvent struct {
-	Order *Order
-}
-
-type TradeExecutedEvent struct {
-	Trade Trade
-}
-
-type OrderFilledEvent struct {
-	Order  *Order
-	Trades []Trade
-}
-
-type OrderPartiallyFilledEvent struct {
-	Order  *Order
-	Trades []Trade
-}
-
-type OrderCancelledEvent struct {
-	Order  *Order
-	Trades []Trade
-}
-
-func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalResponse, []EngineEvent, error) {
+func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalResponse, []*pb.EngineEvent, error) {
 	if _, exists := me.AllOrders[order.ClientOrderID]; exists {
 		return nil, nil, fmt.Errorf("Duplicate Order ID: %s", order.ClientOrderID)
 	}
@@ -426,18 +384,14 @@ type Trade struct {
 	TradeSequence uint64
 	Price         int64
 	Quantity      int64
-	Timeline      time.Time
-
-	RestingOrderID   string
-	AggressorOrderID string
-
-	AggressorOrder *Order
-	RestingOrder   *Order
+	Timeline      *timestamppb.Timestamp
 
 	BuyerID     string
 	SellerID    string
 	BuyOrderID  string
 	SellOrderID string
+
+	IsBuyerMaker bool
 }
 
 func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, matchQuantity int64, matchPrice int64) Trade {
@@ -470,17 +424,14 @@ func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, ma
 		TradeSequence: me.TradeSequence,
 		Price:         matchPrice,
 		Quantity:      matchQuantity,
-		Timeline:      time.Now(),
-
-		RestingOrderID:   restingOrder.ClientOrderID,
-		AggressorOrderID: aggressor.ClientOrderID,
-		RestingOrder:     restingOrder,
-		AggressorOrder:   aggressor,
+		Timeline:      timestamppb.Now(),
 
 		BuyOrderID:  BuyOrderID,
 		BuyerID:     BuyerID,
 		SellOrderID: SellOrderID,
 		SellerID:    SellerID,
+
+		IsBuyerMaker: restingOrder.Side == pbTypes.Side_BUY,
 	}
 }
 
@@ -492,46 +443,49 @@ func (me *MatchingEngine) GenerateTradeID(seq uint64) string {
 func (me *MatchingEngine) buildEvents(
 	order *Order,
 	trades []Trade,
-) []EngineEvent {
+) []*pb.EngineEvent {
 
-	events := []EngineEvent{}
+	events := []*pb.EngineEvent{}
+	data, _ := EncodeOrderStatusEvent(order, StrPtr(""))
 
 	// ---------- REJECT ----------
 	if order.Status == pbTypes.OrderStatus_REJECTED {
-		return []EngineEvent{
+
+		return []*pb.EngineEvent{
 			{
-				Type: uint8(EngineEventType_ORDER_REJECTED),
-				Data: OrderRejectedEvent{Order: order},
+				EventType: pbTypes.EventType_ORDER_REJECTED,
+				Data:      data,
 			},
 		}
 	}
 
 	// ---------- ACCEPT ----------
-	events = append(events, EngineEvent{
-		Type: uint8(EngineEventType_ORDER_ACCEPTED),
-		Data: OrderAcceptedEvent{Order: order},
+	events = append(events, &pb.EngineEvent{
+		EventType: pbTypes.EventType_ORDER_ACCEPTED,
+		Data:      data,
 	})
 
 	// ---------- TRADES ----------
 	for _, trade := range trades {
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_TRADE_EXECUTED),
-			Data: TradeExecutedEvent{Trade: trade},
+		tradeData, _ := EncodeTradeEvent(&trade)
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_TRADE_EXECUTED,
+			Data:      tradeData,
 		})
 	}
 
 	// ---------- FINAL STATE ----------
 	switch order.Status {
 	case pbTypes.OrderStatus_FILLED:
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_ORDER_FILLED),
-			Data: OrderFilledEvent{Order: order, Trades: trades},
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_FILLED,
+			Data:      data,
 		})
 
 	case pbTypes.OrderStatus_CANCELLED:
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_ORDER_CANCELLED),
-			Data: OrderCancelledEvent{Order: order, Trades: trades},
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_CANCELLED,
+			Data:      data,
 		})
 	}
 
@@ -548,9 +502,9 @@ func (me *MatchingEngine) CancelOrderInternal(
 	id string,
 	userID string,
 	symbol string,
-) (*CancelOrderInternalResponse, []EngineEvent, error) {
+) (*CancelOrderInternalResponse, []*pb.EngineEvent, error) {
 
-	events := []EngineEvent{}
+	events := []*pb.EngineEvent{}
 
 	order, ok := me.AllOrders[id]
 	if !ok {
@@ -591,12 +545,10 @@ func (me *MatchingEngine) CancelOrderInternal(
 		obs.RemovePriceLevel(level)
 	}
 
-	// emit fact
-	events = append(events, EngineEvent{
-		Type: uint8(EngineEventType_ORDER_CANCELLED),
-		Data: OrderCancelledEvent{
-			Order: order,
-		},
+	data, _ := EncodeOrderStatusEvent(order, StrPtr(""))
+	events = append(events, &pb.EngineEvent{
+		EventType: pbTypes.EventType_ORDER_CANCELLED,
+		Data:      data,
 	})
 
 	return &CancelOrderInternalResponse{
@@ -620,7 +572,7 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	newOrderID string, // required ONLY for replace
 	newPrice *int64,
 	newQuantity *int64,
-) (*ModifyOrderInternalResponse, []EngineEvent, error) {
+) (*ModifyOrderInternalResponse, []*pb.EngineEvent, error) {
 
 	order, ok := me.AllOrders[oldOrderID]
 	if !ok {
@@ -682,44 +634,57 @@ func (me *MatchingEngine) ModifyOrderInternal(
 func (me *MatchingEngine) reduceOrder(
 	order *Order,
 	newQuantity *int64,
-) ([]EngineEvent, error) {
+) ([]*pb.EngineEvent, error) {
+
+	events := []*pb.EngineEvent{}
 
 	if newQuantity == nil {
 		return nil, fmt.Errorf("quantity required")
 	}
 
-	executed := order.Quantity - order.RemainingQuantity
+	oldQuantity := order.Quantity
+	oldRemaining := order.RemainingQuantity
+
+	executed := oldQuantity - oldRemaining
 	newRemaining := *newQuantity - executed
 
 	if newRemaining < 0 {
 		return nil, fmt.Errorf("invalid reduce")
 	}
 
+	// apply mutation
 	order.Quantity = *newQuantity
 	order.RemainingQuantity = newRemaining
 
+	// update price level volume
 	if order.PriceLevel != nil {
-		volumeDelta := order.RemainingQuantity - newRemaining
+		volumeDelta := oldRemaining - newRemaining
 		order.PriceLevel.TotalVolume -= uint64(volumeDelta)
 	}
 
-	// snapshot update (NO semantic meaning here)
-	return []EngineEvent{
-		{
-			Type: uint8(EngineEventType_ORDER_UPDATED),
-			Data: struct {
-				OrderID           string
-				Price             int64
-				Quantity          int64
-				RemainingQuantity int64
-			}{
-				OrderID:           order.ClientOrderID,
-				Price:             order.Price,
-				Quantity:          order.Quantity,
-				RemainingQuantity: order.RemainingQuantity,
-			},
-		},
-	}, nil
+	// emit correct event
+	if order.RemainingQuantity == 0 {
+		event, err := EncodeOrderStatusEvent(order, StrPtr("remaining quantity become 0"))
+		if err != nil {
+			return nil, err
+		}
+
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_CANCELLED,
+			Data:      event,
+		})
+	} else {
+		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_REDUCED,
+			Data:      event,
+		})
+	}
+
+	return events, nil
 }
 
 func (me *MatchingEngine) replaceOrder(
@@ -727,9 +692,9 @@ func (me *MatchingEngine) replaceOrder(
 	newOrderID string,
 	newPrice *int64,
 	newQuantity *int64,
-) ([]EngineEvent, error) {
+) ([]*pb.EngineEvent, error) {
 
-	var events []EngineEvent
+	var events []*pb.EngineEvent
 	executed := order.Quantity - order.RemainingQuantity
 
 	// ---------- cancel old ----------
@@ -816,6 +781,7 @@ type SymbolActor struct {
 
 	wal          *SymbolWAL
 	kafkaEmitter *KafkaProducerWorker
+	grpcStreams  []pb.MatchingEngine_SubscribeSymbolServer
 }
 
 func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
@@ -838,9 +804,10 @@ func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
 	return &SymbolActor{
 		symbol:       symbol.Name,
 		inbox:        make(chan EngineMsg, buffer),
-		engine:       NewMatchingEngine(symbol.Name),
+		engine:       NewMatchingEngine(symbol.Name, wal),
 		wal:          wal,
 		kafkaEmitter: kakfaWoker,
+		grpcStreams:  make([]pb.MatchingEngine_SubscribeSymbolServer, 0),
 	}, nil
 }
 
@@ -855,7 +822,21 @@ func (a *SymbolActor) Run() {
 			}
 			m.Reply <- response
 
-			a.PublishKafkaEvents(events)
+			for _, event := range events {
+				data, err := proto.Marshal(event)
+				if err != nil {
+					m.Err <- err
+					continue
+				}
+				for _, stream := range a.grpcStreams {
+					stream.Send(event)
+				}
+
+				if err := a.wal.writeEntry(data); err != nil {
+					m.Err <- err
+					continue
+				}
+			}
 
 		case CancelOrderMsg:
 			response, events, err := a.engine.CancelOrderInternal(m.ID, m.UserID, m.Symbol)
@@ -866,7 +847,18 @@ func (a *SymbolActor) Run() {
 			}
 			m.Reply <- response
 
-			a.PublishKafkaEvents(events)
+			for _, event := range events {
+				data, err := proto.Marshal(event)
+				if err != nil {
+					m.Err <- err
+					continue
+				}
+				if err := a.wal.writeEntry(data); err != nil {
+					m.Err <- err
+					continue
+				}
+			}
+
 		case ModifyOrderMsg:
 			response, events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
 
@@ -876,15 +868,22 @@ func (a *SymbolActor) Run() {
 			}
 			m.Reply <- response
 
-			a.PublishKafkaEvents(events)
+			for _, event := range events {
+				data, err := proto.Marshal(event)
+				if err != nil {
+					m.Err <- err
+					continue
+				}
+				if err := a.wal.writeEntry(data); err != nil {
+					m.Err <- err
+					continue
+				}
+
+			}
 
 		default:
 			panic("unknown actor message")
 		}
 
 	}
-}
-
-func (a *SymbolActor) PublishKafkaEvents(events []EngineEvent) {
-
 }

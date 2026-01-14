@@ -77,8 +77,98 @@ message ModifyOrderResponse {
   string status_message = 5;
 }
 
+message SubscribeRequest {
+  string symbol = 1;      
+  string gateway_id = 2;   // Unique ws gateway identifier
+  int64 timestamp = 3;     // Subscription timestamp
+}
+
+// Events pushed from engine to ws gateway via stream
+message EngineEvent {
+  common.order.EventType event_type = 1;   // "trade", "depth", "order_update", "ticker"
+  bytes data = 2;          
+  string symbol = 3;       // Symbol
+}
+
 service MatchingEngine {
   rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
   rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
   rpc ModifyOrder(ModifyOrderRequest) returns (ModifyOrderResponse);
+
+  rpc SubscribeSymbol(SubscribeRequest) returns (stream EngineEvent);
 }
+
+
+// ============= EVENT DATA STRUCTURES =============
+// These are encoded as JSON in SymbolEvent.data field
+
+// Trade event (sent when a trade executes)
+message TradeEvent {
+  string trade_id = 1;
+  string symbol = 2;
+  uint64 trade_sequence = 3;
+  int64 price = 4;
+  int64 quantity = 5;
+  string buyer_id = 6;
+  string seller_id = 7;
+  string buy_order_id = 8;
+  string sell_order_id = 9;
+  google.protobuf.Timestamp timestamp = 10;
+  bool is_buyer_maker = 11;  // True if buyer order was in book first
+}
+
+// Depth update event (sent when order book changes)
+message DepthEvent {
+  string symbol = 1;
+  repeated PriceLevel bids = 2;
+  repeated PriceLevel asks = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  int64 sequence = 5;
+}
+
+message PriceLevel {
+  int64 price = 1;
+  int64 quantity = 2;
+  int64 order_count = 3;  // Number of orders at this level
+  int64 volume = 4;
+}
+
+// Order update event (sent to specific user)
+message OrderStatusEvent {
+  string order_id = 1;
+  string user_id = 2;
+  string symbol = 3;
+  common.order.OrderStatus status = 4;  // "FILLED", "PARTIAL", "CANCELLED", "REJECTED"
+  optional  string status_message = 5;
+  int64 filled_quantity = 6;
+  int64 remaining_quantity = 7;
+  int64 cancelled_quantity = 8;
+  int64 average_price = 9;
+  google.protobuf.Timestamp gateway_timestamp = 10;
+  google.protobuf.Timestamp client_timestamp = 11;
+  google.protobuf.Timestamp engine_timestamp = 12;
+}
+
+message OrderReducedEvent {
+  OrderStatusEvent Order = 1;
+  int64 old_quantity = 2;
+  int64 new_quantity = 3;
+  int64 old_remaining_quantity = 4;
+  int64 new_remaining_quantity = 5;
+}
+
+// Ticker event (periodic price updates)
+message TickerEvent {
+  string symbol = 1;
+  int64 last_price = 2;
+  int64 bid_price = 3;
+  int64 ask_price = 4;
+  int64 volume_24h = 5;
+  int64 high_24h = 6;
+  int64 low_24h = 7;
+  int64 price_change_24h = 8;
+  int64 price_change_percent_24h = 9;
+  google.protobuf.Timestamp timestamp = 10;
+}
+
+
