@@ -11,18 +11,25 @@ func StrPtr(s string) *string {
 
 func EncodeOrderStatusEvent(order *Order, statusMessage *string) ([]byte, error) {
 	eventByte, err := proto.Marshal(&pb.OrderStatusEvent{
-		OrderId:           order.ClientOrderID,
-		UserId:            order.UserID,
-		Symbol:            order.Symbol,
-		Status:            order.Status,
-		StatusMessage:     statusMessage,
+		OrderId: order.ClientOrderID,
+		UserId:  order.UserID,
+		Symbol:  order.Symbol,
+		Status:  order.Status,
+		Side:    order.Side,
+		Type:    order.Type,
+
+		Price:         order.Price,
+		ExecutedValue: order.ExecutedValue,
+		AveragePrice:  order.AveragePrice,
+
+		Quantity:          order.Quantity,
 		FilledQuantity:    order.FilledQuantity,
 		RemainingQuantity: order.RemainingQuantity,
 		CancelledQuantity: order.CancelledQuantity,
-		AveragePrice:      order.AveragePrice,
-		GatewayTimestamp:  order.GatewayTimestamp,
-		ClientTimestamp:   order.ClientTimestamp,
-		EngineTimestamp:   order.EngineTimestamp,
+
+		GatewayTimestamp: order.GatewayTimestamp,
+		ClientTimestamp:  order.ClientTimestamp,
+		EngineTimestamp:  order.EngineTimestamp,
 	})
 	if err != nil {
 		return nil, err
@@ -33,17 +40,26 @@ func EncodeOrderStatusEvent(order *Order, statusMessage *string) ([]byte, error)
 
 func EncodeOrderReducedEvent(order *Order, oldQuantity int64, oldRemainingQuantiy int64) ([]byte, error) {
 	eventByte, err := proto.Marshal(&pb.OrderReducedEvent{
-		Order: &pb.OrderStatusEvent{OrderId: order.ClientOrderID,
-			UserId:            order.UserID,
-			Symbol:            order.Symbol,
-			Status:            order.Status,
+		Order: &pb.OrderStatusEvent{
+			OrderId: order.ClientOrderID,
+			UserId:  order.UserID,
+			Symbol:  order.Symbol,
+			Status:  order.Status,
+			Side:    order.Side,
+			Type:    order.Type,
+
+			Price:         order.Price,
+			ExecutedValue: order.ExecutedValue,
+			AveragePrice:  order.AveragePrice,
+
+			Quantity:          order.Quantity,
 			FilledQuantity:    order.FilledQuantity,
 			RemainingQuantity: order.RemainingQuantity,
 			CancelledQuantity: order.CancelledQuantity,
-			AveragePrice:      order.AveragePrice,
-			GatewayTimestamp:  order.GatewayTimestamp,
-			ClientTimestamp:   order.ClientTimestamp,
-			EngineTimestamp:   order.EngineTimestamp,
+
+			GatewayTimestamp: order.GatewayTimestamp,
+			ClientTimestamp:  order.ClientTimestamp,
+			EngineTimestamp:  order.EngineTimestamp,
 		},
 		OldQuantity:          oldQuantity,
 		NewQuantity:          order.Quantity,

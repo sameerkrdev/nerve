@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	pbTypes "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
@@ -669,10 +670,25 @@ func (me *MatchingEngine) reduceOrder(
 			return nil, err
 		}
 
+		level := order.PriceLevel
+
+		level.Remove(order)
+		delete(me.AllOrders, order.ClientOrderID)
+
+		obs := me.Asks
+		if order.Side == pbTypes.Side_BUY {
+			obs = me.Bids
+		}
+
+		if level.IsEmpty() {
+			obs.RemovePriceLevel(level)
+		}
+
 		events = append(events, &pb.EngineEvent{
 			EventType: pbTypes.EventType_ORDER_CANCELLED,
 			Data:      event,
 		})
+
 	} else {
 		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining)
 		if err != nil {
@@ -782,6 +798,8 @@ type SymbolActor struct {
 	wal          *SymbolWAL
 	kafkaEmitter *KafkaProducerWorker
 	grpcStreams  []pb.MatchingEngine_SubscribeSymbolServer
+
+	mu sync.RWMutex
 }
 
 func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
@@ -886,4 +904,218 @@ func (a *SymbolActor) Run() {
 		}
 
 	}
+}
+
+func (a *SymbolActor) ReplyWal(from uint64) error {
+	logs, err := a.wal.ReadFromToLast(from)
+	if err != nil {
+		return err
+	}
+
+	for _, log := range logs {
+		var logData pb.EngineEvent
+
+		if err := proto.Unmarshal(log.GetData(), &logData); err != nil {
+			return err
+		}
+
+		switch logData.EventType {
+		case pbTypes.EventType_ORDER_ACCEPTED:
+			var event pb.OrderStatusEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := &Order{
+				Symbol:        event.Symbol,
+				Status:        event.Status,
+				UserID:        event.UserId,
+				ClientOrderID: event.OrderId,
+				Side:          event.Side,
+				Type:          event.Type,
+
+				Price:         event.Price,
+				AveragePrice:  event.AveragePrice,
+				ExecutedValue: event.ExecutedValue,
+
+				Quantity:          event.Quantity,
+				FilledQuantity:    event.FilledQuantity,
+				RemainingQuantity: event.RemainingQuantity,
+				CancelledQuantity: event.CancelledQuantity,
+
+				ClientTimestamp:  event.ClientTimestamp,
+				GatewayTimestamp: event.GatewayTimestamp,
+				EngineTimestamp:  event.EngineTimestamp,
+			}
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			priceLevel := obs.GetOrCreatePriceLevel(order.Price)
+			priceLevel.Push(order)
+			a.engine.AllOrders[order.ClientOrderID] = order
+
+		case pbTypes.EventType_TRADE_EXECUTED:
+			var event pb.TradeEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			buyOrder := a.engine.AllOrders[event.BuyOrderId]
+			sellOrder := a.engine.AllOrders[event.SellOrderId]
+
+			restingOrder := sellOrder
+			order := buyOrder
+
+			if event.IsBuyerMaker {
+				restingOrder = buyOrder
+				order = sellOrder
+			}
+
+			restingOrder.RemainingQuantity -= event.Quantity
+			order.RemainingQuantity -= event.Quantity
+
+			restingOrder.FilledQuantity += event.Quantity
+			order.FilledQuantity += event.Quantity
+
+			restingOrder.ExecutedValue += event.Price * event.Quantity
+			order.ExecutedValue += event.Price * event.Quantity
+
+			restingOrder.AveragePrice = restingOrder.ExecutedValue / restingOrder.FilledQuantity
+			order.AveragePrice = order.ExecutedValue / order.FilledQuantity
+
+			a.engine.TotalMatches++
+			a.engine.TotalVolume += uint64(event.Quantity)
+			a.engine.TradeSequence++
+
+			if restingOrder.RemainingQuantity == 0 {
+				restingOrder.Status = pbTypes.OrderStatus_FILLED
+				obs := a.engine.Asks
+				if restingOrder.Side == pbTypes.Side_BUY {
+					obs = a.engine.Bids
+				}
+				level := obs.PriceLevels[order.Price]
+
+				level.Remove(restingOrder)
+				delete(a.engine.AllOrders, restingOrder.ClientOrderID)
+
+				if level.IsEmpty() {
+					obs.RemovePriceLevel(level)
+				}
+
+			} else {
+				restingOrder.Status = pbTypes.OrderStatus_PARTIAL_FILLED
+			}
+
+			if order.RemainingQuantity == 0 {
+				order.Status = pbTypes.OrderStatus_FILLED
+				obs := a.engine.Asks
+				if order.Side == pbTypes.Side_BUY {
+					obs = a.engine.Bids
+				}
+				level := obs.PriceLevels[order.Price]
+
+				level.Remove(order)
+				delete(a.engine.AllOrders, order.ClientOrderID)
+
+				if level.IsEmpty() {
+					obs.RemovePriceLevel(level)
+				}
+			} else {
+				order.Status = pbTypes.OrderStatus_PARTIAL_FILLED
+			}
+
+		case pbTypes.EventType_ORDER_CANCELLED:
+			var event pb.OrderStatusEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := a.engine.AllOrders[event.OrderId]
+			level := order.PriceLevel
+
+			order.CancelledQuantity = event.CancelledQuantity
+			order.RemainingQuantity = event.RemainingQuantity
+			order.FilledQuantity = event.FilledQuantity
+
+			order.Status = pbTypes.OrderStatus_CANCELLED
+
+			level.Remove(order)
+			delete(a.engine.AllOrders, order.ClientOrderID)
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			if level.IsEmpty() {
+				obs.RemovePriceLevel(level)
+			}
+
+		case pbTypes.EventType_ORDER_REDUCED:
+			var event pb.OrderReducedEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := a.engine.AllOrders[event.Order.OrderId]
+			level := order.PriceLevel
+
+			order.Quantity = event.NewQuantity
+			order.RemainingQuantity = event.NewRemainingQuantity
+
+			volumeDelta := event.OldRemainingQuantity - event.NewRemainingQuantity
+			order.PriceLevel.TotalVolume -= uint64(volumeDelta)
+
+			if order.RemainingQuantity == 0 {
+				level.Remove(order)
+				delete(a.engine.AllOrders, order.ClientOrderID)
+
+				obs := a.engine.Asks
+				if order.Side == pbTypes.Side_BUY {
+					obs = a.engine.Bids
+				}
+
+				if level.IsEmpty() {
+					obs.RemovePriceLevel(level)
+				}
+			}
+
+		case pbTypes.EventType_ORDER_REJECTED:
+			// TODO: Complete this
+
+		case pbTypes.EventType_ORDER_FILLED:
+			var event pb.OrderReducedEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := a.engine.AllOrders[event.Order.OrderId]
+			level := order.PriceLevel
+
+			level.Remove(order)
+			delete(a.engine.AllOrders, order.ClientOrderID)
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			if level.IsEmpty() {
+				obs.RemovePriceLevel(level)
+			}
+
+		default:
+			continue
+		}
+	}
+
+	return nil
 }

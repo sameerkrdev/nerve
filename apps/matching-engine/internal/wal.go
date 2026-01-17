@@ -378,6 +378,70 @@ func (sw *SymbolWAL) ReadFromTo(from, to uint64) ([]*pbTypes.WAL_Entry, error) {
 	return results, nil
 }
 
+func (sw *SymbolWAL) ReadFromToLast(from uint64) ([]*pbTypes.WAL_Entry, error) {
+	if from > 0 {
+		return nil, fmt.Errorf("invalid from")
+	}
+
+	entries, err := os.ReadDir(sw.dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	results := make([]*pbTypes.WAL_Entry, 0, 1_000_000)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		filePath := filepath.Join(sw.dirPath, entry.Name())
+
+		file, err := os.Open(filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		for {
+			var size uint32
+			if err := binary.Read(file, binary.LittleEndian, &size); err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, err
+			}
+			if size == 0 {
+				return nil, fmt.Errorf("invalid WAL record size")
+			}
+
+			data := make([]byte, size)
+			if _, err := io.ReadFull(file, data); err != nil {
+				return nil, err
+			}
+
+			logEntry, err := unmarshalAndVerifyEntry(data)
+			if err != nil {
+				return nil, err
+			}
+
+			seq := logEntry.GetSequenceNumber()
+
+			if seq < from {
+				continue
+			}
+
+			results = append(results, logEntry)
+		}
+	}
+
+	return results, nil
+}
+
 func unmarshalAndVerifyEntry(data []byte) (*pbTypes.WAL_Entry, error) {
 
 	// Unmarshal protobuf

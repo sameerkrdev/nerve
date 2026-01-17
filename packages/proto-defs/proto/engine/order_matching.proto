@@ -138,15 +138,20 @@ message OrderStatusEvent {
   string order_id = 1;
   string user_id = 2;
   string symbol = 3;
-  common.order.OrderStatus status = 4;  // "FILLED", "PARTIAL", "CANCELLED", "REJECTED"
-  optional  string status_message = 5;
-  int64 filled_quantity = 6;
-  int64 remaining_quantity = 7;
-  int64 cancelled_quantity = 8;
-  int64 average_price = 9;
-  google.protobuf.Timestamp gateway_timestamp = 10;
-  google.protobuf.Timestamp client_timestamp = 11;
-  google.protobuf.Timestamp engine_timestamp = 12;
+  int64 price = 4;
+  common.order.Side side = 5;
+  common.order.OrderType type = 6;
+  int64 quantity = 7;
+  int64 executed_value = 8;
+  common.order.OrderStatus status = 9;  // "FILLED", "PARTIAL", "CANCELLED", "REJECTED"
+  optional  string status_message = 10;
+  int64 filled_quantity = 11;
+  int64 remaining_quantity = 12;
+  int64 cancelled_quantity = 13;
+  int64 average_price = 14;
+  google.protobuf.Timestamp gateway_timestamp = 15;
+  google.protobuf.Timestamp client_timestamp = 16;
+  google.protobuf.Timestamp engine_timestamp = 17;
 }
 
 message OrderReducedEvent {

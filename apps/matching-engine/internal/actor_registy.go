@@ -27,10 +27,10 @@ func StartActors(symbols []Symbol) {
 		if err != nil {
 			log.Fatalln("Failed to start actor", symbols)
 		}
-		actors[sym.Name] = actor
 
 		// 1. Load snapshot (if exists)
 		// 2. Replay WAL (blocking)
+		actor.ReplyWal(0)
 
 		// 3. Start other workers owned by actor
 		go actor.wal.keepSyncing()
@@ -39,6 +39,8 @@ func StartActors(symbols []Symbol) {
 
 		// 4. Start actor loop LAST
 		go actor.Run()
+
+		actors[sym.Name] = actor
 	}
 }
 
@@ -130,14 +132,18 @@ func SubscribeSymbol(symbol string, gatewayId string, stream pb.MatchingEngine_S
 		return fmt.Errorf("unknown symbol %s", symbol)
 	}
 
+	actor.mu.Lock()
 	actor.grpcStreams = append(actor.grpcStreams, stream)
+	actor.mu.Unlock()
 	slog.Info(fmt.Sprintf("Gateway %s subscribed to %s via dedicated stream", gatewayId, symbol))
 
 	<-stream.Context().Done()
 
 	for i, s := range actor.grpcStreams {
 		if s == stream {
+			actor.mu.Lock()
 			actor.grpcStreams = append(actor.grpcStreams[:i], actor.grpcStreams[i+1:]...)
+			actor.mu.Unlock()
 			break
 		}
 	}
