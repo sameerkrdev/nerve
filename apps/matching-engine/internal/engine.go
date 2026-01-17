@@ -312,11 +312,12 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 	for incoming.RemainingQuantity > 0 && me.CanMatch(oppositeBook, incoming) {
 		bestPriceLevel := oppositeBook.BestPriceLevel
 		restingOrder := bestPriceLevel.HeadOrder
+		fmt.Println("inside the loop start")
 
 		// Self-trade prevention
-		if incoming.UserID == restingOrder.UserID {
-			break // skip resting order
-		}
+		// if incoming.UserID == restingOrder.UserID {
+		// 	break // skip resting order
+		// }
 
 		matchQuantity := min(incoming.RemainingQuantity, restingOrder.RemainingQuantity)
 		matchPrice := restingOrder.Price
@@ -351,7 +352,6 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 				oppositeBook.RemovePriceLevel(bestPriceLevel)
 			}
 		}
-
 	}
 
 	if incoming.RemainingQuantity == 0 {
@@ -463,7 +463,9 @@ func (me *MatchingEngine) buildEvents(
 	// ---------- ACCEPT ----------
 	events = append(events, &pb.EngineEvent{
 		EventType: pbTypes.EventType_ORDER_ACCEPTED,
-		Data:      data,
+		UserId:    order.UserID,
+
+		Data: data,
 	})
 
 	// ---------- TRADES ----------
@@ -471,6 +473,7 @@ func (me *MatchingEngine) buildEvents(
 		tradeData, _ := EncodeTradeEvent(&trade)
 		events = append(events, &pb.EngineEvent{
 			EventType: pbTypes.EventType_TRADE_EXECUTED,
+			UserId:    order.UserID,
 			Data:      tradeData,
 		})
 	}
@@ -480,12 +483,14 @@ func (me *MatchingEngine) buildEvents(
 	case pbTypes.OrderStatus_FILLED:
 		events = append(events, &pb.EngineEvent{
 			EventType: pbTypes.EventType_ORDER_FILLED,
+			UserId:    order.UserID,
 			Data:      data,
 		})
 
 	case pbTypes.OrderStatus_CANCELLED:
 		events = append(events, &pb.EngineEvent{
 			EventType: pbTypes.EventType_ORDER_CANCELLED,
+			UserId:    order.UserID,
 			Data:      data,
 		})
 	}
@@ -549,6 +554,7 @@ func (me *MatchingEngine) CancelOrderInternal(
 	data, _ := EncodeOrderStatusEvent(order, StrPtr(""))
 	events = append(events, &pb.EngineEvent{
 		EventType: pbTypes.EventType_ORDER_CANCELLED,
+		UserId:    order.UserID,
 		Data:      data,
 	})
 
@@ -686,6 +692,7 @@ func (me *MatchingEngine) reduceOrder(
 
 		events = append(events, &pb.EngineEvent{
 			EventType: pbTypes.EventType_ORDER_CANCELLED,
+			UserId:    order.UserID,
 			Data:      event,
 		})
 
@@ -696,6 +703,7 @@ func (me *MatchingEngine) reduceOrder(
 		}
 		events = append(events, &pb.EngineEvent{
 			EventType: pbTypes.EventType_ORDER_REDUCED,
+			UserId:    order.UserID,
 			Data:      event,
 		})
 	}
@@ -838,23 +846,25 @@ func (a *SymbolActor) Run() {
 				m.Err <- err
 				continue
 			}
-			m.Reply <- response
 
 			for _, event := range events {
+
 				data, err := proto.Marshal(event)
 				if err != nil {
 					m.Err <- err
 					continue
 				}
+
 				for _, stream := range a.grpcStreams {
 					stream.Send(event)
 				}
-
-				if err := a.wal.writeEntry(data); err != nil {
+				if err := a.wal.WriteEntry(data); err != nil {
 					m.Err <- err
 					continue
 				}
 			}
+
+			m.Reply <- response
 
 		case CancelOrderMsg:
 			response, events, err := a.engine.CancelOrderInternal(m.ID, m.UserID, m.Symbol)

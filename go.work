@@ -2,5 +2,6 @@ go 1.25.4
 
 use (
 	./apps/matching-engine
+	./apps/websocket-server
 	./packages/proto-defs/go/generated
 )

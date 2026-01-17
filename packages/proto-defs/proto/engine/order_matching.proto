@@ -86,8 +86,9 @@ message SubscribeRequest {
 // Events pushed from engine to ws gateway via stream
 message EngineEvent {
   common.order.EventType event_type = 1;   // "trade", "depth", "order_update", "ticker"
-  bytes data = 2;          
-  string symbol = 3;       // Symbol
+  string user_id = 2;
+  bytes data = 3;          
+  string symbol = 4;       // Symbol
 }
 
 service MatchingEngine {
