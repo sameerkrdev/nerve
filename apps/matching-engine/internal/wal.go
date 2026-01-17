@@ -31,7 +31,6 @@ type SymbolWAL struct {
 
 	currentSegmentFile  *os.File
 	maxFileSize         int64
-	maxSegment          int
 	currentSegmentIndex int
 
 	shouldFsync    bool
@@ -47,7 +46,8 @@ type SymbolWAL struct {
 
 func OpenWAL(dir string, symbol string, maxFileSize int64, enableFsync bool, syncIntervalMM int) (*SymbolWAL, error) {
 	dirPath := filepath.Join(dir, symbol)
-	if err := os.Mkdir(dirPath, 0755); err != nil {
+
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return nil, err
 	}
 
@@ -202,9 +202,6 @@ func (sw *SymbolWAL) rotateFile() error {
 }
 
 func (sw *SymbolWAL) Sync() error {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
-
 	if err := sw.bufferWriter.Flush(); err != nil {
 		return err
 	}
@@ -221,14 +218,15 @@ func (sw *SymbolWAL) Sync() error {
 }
 
 func (sw *SymbolWAL) resetTimer() {
-	sw.mu.Lock()
 	sw.syncTimer.Reset(time.Duration(sw.syncIntervalMM) * time.Millisecond)
-	sw.mu.Unlock()
 }
 
 func (sw *SymbolWAL) keepSyncing() {
 	for range sw.syncTimer.C {
+
+		sw.mu.Lock()
 		err := sw.Sync()
+		sw.mu.Unlock()
 
 		if err != nil {
 			log.Printf("Error while performing sync: %v", err)
@@ -250,7 +248,7 @@ func (sw *SymbolWAL) findLastSequenceNumber(filename string) (uint64, error) {
 }
 
 func (sw *SymbolWAL) findLastEntryInLog(filename string) (*pbTypes.WAL_Entry, error) {
-	file, err := os.OpenFile(filepath.Join(sw.dirPath, filename), os.O_RDONLY, 0644)
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -17,8 +16,6 @@ type Server struct {
 }
 
 func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
-	// slog.Info("Place Order:", in)
-
 	order := &Order{
 		Symbol:            req.Symbol,
 		Price:             req.Price,
@@ -42,8 +39,6 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		)
 		return nil, err
 	}
-
-	fmt.Println(res.Order, res.Trades)
 
 	return &pb.PlaceOrderResponse{
 		ClientOrderId:     res.Order.ClientOrderID,
@@ -100,7 +95,7 @@ func (s *Server) ModifyOrder(ctx context.Context, req *pb.ModifyOrderRequest) (*
 	}, nil
 }
 
-func (s *Server) SubscribeEvents(req *pb.SubscribeRequest, stream pb.MatchingEngine_SubscribeSymbolServer) error {
+func (s *Server) SubscribeSymbol(req *pb.SubscribeRequest, stream pb.MatchingEngine_SubscribeSymbolServer) error {
 	symbol := req.Symbol
 	gatewayId := req.GatewayId
 

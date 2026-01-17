@@ -25,7 +25,7 @@ func StartActors(symbols []Symbol) {
 	for _, sym := range symbols {
 		actor, err := NewSymbolActor(sym, 8192)
 		if err != nil {
-			log.Fatalln("Failed to start actor", symbols)
+			log.Fatalln("Failed to start actor", symbols, err)
 		}
 
 		// 1. Load snapshot (if exists)

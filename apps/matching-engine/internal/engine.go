@@ -848,7 +848,6 @@ func (a *SymbolActor) Run() {
 			}
 
 			for _, event := range events {
-
 				data, err := proto.Marshal(event)
 				if err != nil {
 					m.Err <- err
@@ -858,6 +857,7 @@ func (a *SymbolActor) Run() {
 				for _, stream := range a.grpcStreams {
 					stream.Send(event)
 				}
+
 				if err := a.wal.WriteEntry(data); err != nil {
 					m.Err <- err
 					continue

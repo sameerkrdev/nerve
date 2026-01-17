@@ -48,13 +48,13 @@ type KafkaProducerWorker struct {
 }
 
 func NewKafkaProducerWorker(symbol string, dirPath string, wal *SymbolWAL, batchSize int, emitTime int) (*KafkaProducerWorker, error) {
-	brokers := []string{"localhost:9092", "localhost:9093", "localhost:9094"}
+	brokers := []string{"localhost:19092", "localhost:19093", "localhost:19094"}
 	producer, err := GetProducer(brokers)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := os.OpenFile(filepath.Join(dirPath, "checkpoint.meta"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile(filepath.Join(dirPath, symbol, "checkpoint.meta"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,11 @@ func (kpw *KafkaProducerWorker) processBatch() {
 		startOffset+1,
 		startOffset+uint64(kpw.batchSize),
 	)
-	lastOffset := events[len(events)-1].GetSequenceNumber()
+
+	lastOffset := uint64(0)
+	if len(events) > 0 {
+		lastOffset = events[len(events)-1].GetSequenceNumber()
+	}
 
 	if len(events) == 0 {
 		return
