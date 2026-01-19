@@ -328,9 +328,86 @@ func (u *User) writePump() {
 				}
 
 			case pbType.EventType_ORDER_REDUCED:
+				var unmarshalData pb.OrderReducedEvent
+
+				if err := proto.Unmarshal(event.Data, &unmarshalData); err != nil {
+					log.Printf("failed to unmarshal order reduced status event for user %s: %v", u.ID, err)
+					return
+				}
+
+				resp := &struct {
+					EventType string                `json:"eventType"`
+					Data      *pb.OrderReducedEvent `json:"data"`
+				}{
+					EventType: event.EventType.String(),
+					Data:      &unmarshalData,
+				}
+
+				if err := u.Conn.WriteJSON(resp); err != nil {
+					log.Printf("failed to write order reduced status event to user %s: %v", u.ID, err)
+					return
+				}
+
 			case pbType.EventType_TRADE_EXECUTED:
+				var unmarshalData pb.TradeEvent
+
+				if err := proto.Unmarshal(event.Data, &unmarshalData); err != nil {
+					log.Printf("failed to unmarshal trade excuted event for user %s: %v", u.ID, err)
+					return
+				}
+
+				resp := &struct {
+					EventType string         `json:"eventType"`
+					Data      *pb.TradeEvent `json:"data"`
+				}{
+					EventType: event.EventType.String(),
+					Data:      &unmarshalData,
+				}
+
+				if err := u.Conn.WriteJSON(resp); err != nil {
+					log.Printf("failed to write trade excuted event to user %s: %v", u.ID, err)
+					return
+				}
 			case pbType.EventType_DEPTH:
+				var unmarshalData pb.DepthEvent
+
+				if err := proto.Unmarshal(event.Data, &unmarshalData); err != nil {
+					log.Printf("failed to unmarshal depth event for user %s: %v", u.ID, err)
+					return
+				}
+
+				resp := &struct {
+					EventType string         `json:"eventType"`
+					Data      *pb.DepthEvent `json:"data"`
+				}{
+					EventType: event.EventType.String(),
+					Data:      &unmarshalData,
+				}
+
+				if err := u.Conn.WriteJSON(resp); err != nil {
+					log.Printf("failed to write depth event to user %s: %v", u.ID, err)
+					return
+				}
 			case pbType.EventType_TICKER:
+				var unmarshalData pb.TickerEvent
+
+				if err := proto.Unmarshal(event.Data, &unmarshalData); err != nil {
+					log.Printf("failed to unmarshal ticker event for user %s: %v", u.ID, err)
+					return
+				}
+
+				resp := &struct {
+					EventType string          `json:"eventType"`
+					Data      *pb.TickerEvent `json:"data"`
+				}{
+					EventType: event.EventType.String(),
+					Data:      &unmarshalData,
+				}
+
+				if err := u.Conn.WriteJSON(resp); err != nil {
+					log.Printf("failed to write ticker event to user %s: %v", u.ID, err)
+					return
+				}
 			}
 		case <-timer.C:
 			u.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
