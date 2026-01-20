@@ -2,9 +2,12 @@ package internal
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	pbTypes "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
+	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -27,8 +30,6 @@ type Order struct {
 	ClientTimestamp   *timestamppb.Timestamp
 	GatewayTimestamp  *timestamppb.Timestamp
 	EngineTimestamp   *timestamppb.Timestamp
-
-	OrderSequence uint64
 
 	Prev *Order
 	Next *Order
@@ -208,6 +209,7 @@ func (obs *OrderBookSide) RemovePriceLevel(level *PriceLevel) {
 ================== Single Symbol Matching Engine Management =====================
 =================================================================================
 */
+
 type MatchingEngine struct {
 	Symbol string
 	Bids   *OrderBookSide
@@ -219,9 +221,11 @@ type MatchingEngine struct {
 	TotalVolume   uint64
 	TradeSequence uint64
 	OrderSequence uint64
+
+	wal *SymbolWAL
 }
 
-func NewMatchingEngine(symbol string) *MatchingEngine {
+func NewMatchingEngine(symbol string, wal *SymbolWAL) *MatchingEngine {
 	return &MatchingEngine{
 		Symbol:        symbol,
 		Bids:          NewOrderBookSide(pbTypes.Side_BUY),
@@ -231,6 +235,7 @@ func NewMatchingEngine(symbol string) *MatchingEngine {
 		TotalVolume:   0,
 		TradeSequence: 0,
 		OrderSequence: 0,
+		wal:           wal,
 	}
 }
 
@@ -239,52 +244,7 @@ type AddOrderInternalResponse struct {
 	Trades []Trade
 }
 
-type EngineEventType uint8
-
-const (
-	EngineEventType_ORDER_ACCEPTED EngineEventType = iota
-	EngineEventType_ORDER_PARTIALLY_FILLED
-	EngineEventType_ORDER_FILLED
-	EngineEventType_ORDER_CANCELLED
-	EngineEventType_ORDER_MODIFY
-	EngineEventType_ORDER_REJECTED
-	EngineEventType_TRADE_EXECUTED
-	EngineEventType_ORDER_UPDATED
-)
-
-type EngineEvent struct {
-	Type uint8
-	Data any
-}
-
-type OrderAcceptedEvent struct {
-	Order *Order
-}
-
-type OrderRejectedEvent struct {
-	Order *Order
-}
-
-type TradeExecutedEvent struct {
-	Trade Trade
-}
-
-type OrderFilledEvent struct {
-	Order  *Order
-	Trades []Trade
-}
-
-type OrderPartiallyFilledEvent struct {
-	Order  *Order
-	Trades []Trade
-}
-
-type OrderCancelledEvent struct {
-	Order  *Order
-	Trades []Trade
-}
-
-func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalResponse, []EngineEvent, error) {
+func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalResponse, []*pb.EngineEvent, error) {
 	if _, exists := me.AllOrders[order.ClientOrderID]; exists {
 		return nil, nil, fmt.Errorf("Duplicate Order ID: %s", order.ClientOrderID)
 	}
@@ -352,11 +312,12 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 	for incoming.RemainingQuantity > 0 && me.CanMatch(oppositeBook, incoming) {
 		bestPriceLevel := oppositeBook.BestPriceLevel
 		restingOrder := bestPriceLevel.HeadOrder
+		fmt.Println("inside the loop start")
 
 		// Self-trade prevention
-		if incoming.UserID == restingOrder.UserID {
-			break // skip resting order
-		}
+		// if incoming.UserID == restingOrder.UserID {
+		// 	break // skip resting order
+		// }
 
 		matchQuantity := min(incoming.RemainingQuantity, restingOrder.RemainingQuantity)
 		matchPrice := restingOrder.Price
@@ -391,7 +352,6 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 				oppositeBook.RemovePriceLevel(bestPriceLevel)
 			}
 		}
-
 	}
 
 	if incoming.RemainingQuantity == 0 {
@@ -425,18 +385,14 @@ type Trade struct {
 	TradeSequence uint64
 	Price         int64
 	Quantity      int64
-	Timeline      time.Time
-
-	RestingOrderID   string
-	AggressorOrderID string
-
-	AggressorOrder *Order
-	RestingOrder   *Order
+	Timeline      *timestamppb.Timestamp
 
 	BuyerID     string
 	SellerID    string
 	BuyOrderID  string
 	SellOrderID string
+
+	IsBuyerMaker bool
 }
 
 func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, matchQuantity int64, matchPrice int64) Trade {
@@ -469,17 +425,14 @@ func (me *MatchingEngine) ExecuteTrade(aggressor *Order, restingOrder *Order, ma
 		TradeSequence: me.TradeSequence,
 		Price:         matchPrice,
 		Quantity:      matchQuantity,
-		Timeline:      time.Now(),
-
-		RestingOrderID:   restingOrder.ClientOrderID,
-		AggressorOrderID: aggressor.ClientOrderID,
-		RestingOrder:     restingOrder,
-		AggressorOrder:   aggressor,
+		Timeline:      timestamppb.Now(),
 
 		BuyOrderID:  BuyOrderID,
 		BuyerID:     BuyerID,
 		SellOrderID: SellOrderID,
 		SellerID:    SellerID,
+
+		IsBuyerMaker: restingOrder.Side == pbTypes.Side_BUY,
 	}
 }
 
@@ -491,46 +444,54 @@ func (me *MatchingEngine) GenerateTradeID(seq uint64) string {
 func (me *MatchingEngine) buildEvents(
 	order *Order,
 	trades []Trade,
-) []EngineEvent {
+) []*pb.EngineEvent {
 
-	events := []EngineEvent{}
+	events := []*pb.EngineEvent{}
+	data, _ := EncodeOrderStatusEvent(order, StrPtr(""))
 
 	// ---------- REJECT ----------
 	if order.Status == pbTypes.OrderStatus_REJECTED {
-		return []EngineEvent{
+
+		return []*pb.EngineEvent{
 			{
-				Type: uint8(EngineEventType_ORDER_REJECTED),
-				Data: OrderRejectedEvent{Order: order},
+				EventType: pbTypes.EventType_ORDER_REJECTED,
+				Data:      data,
 			},
 		}
 	}
 
 	// ---------- ACCEPT ----------
-	events = append(events, EngineEvent{
-		Type: uint8(EngineEventType_ORDER_ACCEPTED),
-		Data: OrderAcceptedEvent{Order: order},
+	events = append(events, &pb.EngineEvent{
+		EventType: pbTypes.EventType_ORDER_ACCEPTED,
+		UserId:    order.UserID,
+
+		Data: data,
 	})
 
 	// ---------- TRADES ----------
 	for _, trade := range trades {
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_TRADE_EXECUTED),
-			Data: TradeExecutedEvent{Trade: trade},
+		tradeData, _ := EncodeTradeEvent(&trade)
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_TRADE_EXECUTED,
+			UserId:    order.UserID,
+			Data:      tradeData,
 		})
 	}
 
 	// ---------- FINAL STATE ----------
 	switch order.Status {
 	case pbTypes.OrderStatus_FILLED:
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_ORDER_FILLED),
-			Data: OrderFilledEvent{Order: order, Trades: trades},
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_FILLED,
+			UserId:    order.UserID,
+			Data:      data,
 		})
 
 	case pbTypes.OrderStatus_CANCELLED:
-		events = append(events, EngineEvent{
-			Type: uint8(EngineEventType_ORDER_CANCELLED),
-			Data: OrderCancelledEvent{Order: order, Trades: trades},
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_CANCELLED,
+			UserId:    order.UserID,
+			Data:      data,
 		})
 	}
 
@@ -547,9 +508,9 @@ func (me *MatchingEngine) CancelOrderInternal(
 	id string,
 	userID string,
 	symbol string,
-) (*CancelOrderInternalResponse, []EngineEvent, error) {
+) (*CancelOrderInternalResponse, []*pb.EngineEvent, error) {
 
-	events := []EngineEvent{}
+	events := []*pb.EngineEvent{}
 
 	order, ok := me.AllOrders[id]
 	if !ok {
@@ -590,12 +551,11 @@ func (me *MatchingEngine) CancelOrderInternal(
 		obs.RemovePriceLevel(level)
 	}
 
-	// emit fact
-	events = append(events, EngineEvent{
-		Type: uint8(EngineEventType_ORDER_CANCELLED),
-		Data: OrderCancelledEvent{
-			Order: order,
-		},
+	data, _ := EncodeOrderStatusEvent(order, StrPtr(""))
+	events = append(events, &pb.EngineEvent{
+		EventType: pbTypes.EventType_ORDER_CANCELLED,
+		UserId:    order.UserID,
+		Data:      data,
 	})
 
 	return &CancelOrderInternalResponse{
@@ -619,26 +579,26 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	newOrderID string, // required ONLY for replace
 	newPrice *int64,
 	newQuantity *int64,
-) ([]EngineEvent, error) {
+) (*ModifyOrderInternalResponse, []*pb.EngineEvent, error) {
 
 	order, ok := me.AllOrders[oldOrderID]
 	if !ok {
-		return nil, fmt.Errorf("order not found")
+		return nil, nil, fmt.Errorf("order not found")
 	}
 	if order.UserID != userID {
-		return nil, fmt.Errorf("unauthorized")
+		return nil, nil, fmt.Errorf("unauthorized")
 	}
 	if order.Symbol != symbol {
-		return nil, fmt.Errorf("symbol mismatch")
+		return nil, nil, fmt.Errorf("symbol mismatch")
 	}
 	if order.Status == pbTypes.OrderStatus_FILLED || order.Status == pbTypes.OrderStatus_CANCELLED {
-		return nil, fmt.Errorf("order not modifiable")
+		return nil, nil, fmt.Errorf("order not modifiable")
 	}
 
 	executed := order.Quantity - order.RemainingQuantity
 
 	if newQuantity != nil && *newQuantity < executed {
-		return nil, fmt.Errorf("new quantity < executed quantity")
+		return nil, nil, fmt.Errorf("new quantity < executed quantity")
 	}
 
 	newRemaining := order.RemainingQuantity
@@ -653,54 +613,102 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	switch {
 	case priceChanged || qtyIncreased:
 		if _, exists := me.AllOrders[newOrderID]; exists {
-			return nil, fmt.Errorf("new_order_id already exists")
+			return nil, nil, fmt.Errorf("new_order_id already exists")
 		}
-		return me.replaceOrder(order, newOrderID, newPrice, newQuantity)
+		events, err := me.replaceOrder(order, newOrderID, newPrice, newQuantity)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		response := &ModifyOrderInternalResponse{OrderID: order.ClientOrderID, OldOrderId: order.ClientOrderID, NewOrderId: newOrderID, Status: "Success"}
+		return response, events, nil
 
 	case qtyReduced:
-		return me.reduceOrder(order, newQuantity)
+
+		events, err := me.reduceOrder(order, newQuantity)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		response := &ModifyOrderInternalResponse{OrderID: order.ClientOrderID, OldOrderId: "", NewOrderId: "", Status: "Success"}
+		return response, events, nil
 
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 }
 
 func (me *MatchingEngine) reduceOrder(
 	order *Order,
 	newQuantity *int64,
-) ([]EngineEvent, error) {
+) ([]*pb.EngineEvent, error) {
+
+	events := []*pb.EngineEvent{}
 
 	if newQuantity == nil {
 		return nil, fmt.Errorf("quantity required")
 	}
 
-	executed := order.Quantity - order.RemainingQuantity
+	oldQuantity := order.Quantity
+	oldRemaining := order.RemainingQuantity
+
+	executed := oldQuantity - oldRemaining
 	newRemaining := *newQuantity - executed
 
 	if newRemaining < 0 {
 		return nil, fmt.Errorf("invalid reduce")
 	}
 
+	// apply mutation
 	order.Quantity = *newQuantity
 	order.RemainingQuantity = newRemaining
 
-	// snapshot update (NO semantic meaning here)
-	return []EngineEvent{
-		{
-			Type: uint8(EngineEventType_ORDER_UPDATED),
-			Data: struct {
-				OrderID           string
-				Price             int64
-				Quantity          int64
-				RemainingQuantity int64
-			}{
-				OrderID:           order.ClientOrderID,
-				Price:             order.Price,
-				Quantity:          order.Quantity,
-				RemainingQuantity: order.RemainingQuantity,
-			},
-		},
-	}, nil
+	// update price level volume
+	if order.PriceLevel != nil {
+		volumeDelta := oldRemaining - newRemaining
+		order.PriceLevel.TotalVolume -= uint64(volumeDelta)
+	}
+
+	// emit correct event
+	if order.RemainingQuantity == 0 {
+		event, err := EncodeOrderStatusEvent(order, StrPtr("remaining quantity become 0"))
+		if err != nil {
+			return nil, err
+		}
+
+		level := order.PriceLevel
+
+		level.Remove(order)
+		delete(me.AllOrders, order.ClientOrderID)
+
+		obs := me.Asks
+		if order.Side == pbTypes.Side_BUY {
+			obs = me.Bids
+		}
+
+		if level.IsEmpty() {
+			obs.RemovePriceLevel(level)
+		}
+
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_CANCELLED,
+			UserId:    order.UserID,
+			Data:      event,
+		})
+
+	} else {
+		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_REDUCED,
+			UserId:    order.UserID,
+			Data:      event,
+		})
+	}
+
+	return events, nil
 }
 
 func (me *MatchingEngine) replaceOrder(
@@ -708,9 +716,10 @@ func (me *MatchingEngine) replaceOrder(
 	newOrderID string,
 	newPrice *int64,
 	newQuantity *int64,
-) ([]EngineEvent, error) {
+) ([]*pb.EngineEvent, error) {
 
-	var events []EngineEvent
+	var events []*pb.EngineEvent
+	executed := order.Quantity - order.RemainingQuantity
 
 	// ---------- cancel old ----------
 	_, cancelEvents, err := me.CancelOrderInternal(
@@ -722,8 +731,6 @@ func (me *MatchingEngine) replaceOrder(
 		return nil, err
 	}
 	events = append(events, cancelEvents...)
-
-	executed := order.Quantity - order.RemainingQuantity
 
 	price := order.Price
 	if newPrice != nil {
@@ -795,14 +802,39 @@ type SymbolActor struct {
 	symbol string
 	inbox  chan EngineMsg
 	engine *MatchingEngine
+
+	wal          *SymbolWAL
+	kafkaEmitter *KafkaProducerWorker
+	grpcStreams  []pb.MatchingEngine_SubscribeSymbolServer
+
+	mu sync.RWMutex
 }
 
-func NewSymbolActor(symbol string, buffer int) *SymbolActor {
-	return &SymbolActor{
-		symbol: symbol,
-		inbox:  make(chan EngineMsg, buffer),
-		engine: NewMatchingEngine(symbol),
+func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
+	wal, err := OpenWAL(symbol.WalDir, symbol.Name, int64(symbol.MaxWalFileSize), symbol.WalShouldFsync, symbol.WalSyncInterval)
+	if err != nil {
+		return nil, err
 	}
+
+	kakfaWoker, err := NewKafkaProducerWorker(
+		symbol.Name,
+		symbol.WalDir,
+		wal,
+		symbol.KafkaBatchSize,
+		symbol.KafkaEmitMM,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SymbolActor{
+		symbol:       symbol.Name,
+		inbox:        make(chan EngineMsg, buffer),
+		engine:       NewMatchingEngine(symbol.Name, wal),
+		wal:          wal,
+		kafkaEmitter: kakfaWoker,
+		grpcStreams:  make([]pb.MatchingEngine_SubscribeSymbolServer, 0),
+	}, nil
 }
 
 func (a *SymbolActor) Run() {
@@ -814,9 +846,25 @@ func (a *SymbolActor) Run() {
 				m.Err <- err
 				continue
 			}
-			m.Reply <- response
 
-			a.PublishKafkaEvents(events)
+			for _, event := range events {
+				data, err := proto.Marshal(event)
+				if err != nil {
+					m.Err <- err
+					continue
+				}
+
+				for _, stream := range a.grpcStreams {
+					stream.Send(event)
+				}
+
+				if err := a.wal.WriteEntry(data); err != nil {
+					m.Err <- err
+					continue
+				}
+			}
+
+			m.Reply <- response
 
 		case CancelOrderMsg:
 			response, events, err := a.engine.CancelOrderInternal(m.ID, m.UserID, m.Symbol)
@@ -827,17 +875,39 @@ func (a *SymbolActor) Run() {
 			}
 			m.Reply <- response
 
-			a.PublishKafkaEvents(events)
+			for _, event := range events {
+				data, err := proto.Marshal(event)
+				if err != nil {
+					m.Err <- err
+					continue
+				}
+				if err := a.wal.writeEntry(data); err != nil {
+					m.Err <- err
+					continue
+				}
+			}
+
 		case ModifyOrderMsg:
-			events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
+			response, events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
 
 			if err != nil {
 				m.Err <- err
 				continue
 			}
-			// m.Reply <- response
+			m.Reply <- response
 
-			a.PublishKafkaEvents(events)
+			for _, event := range events {
+				data, err := proto.Marshal(event)
+				if err != nil {
+					m.Err <- err
+					continue
+				}
+				if err := a.wal.writeEntry(data); err != nil {
+					m.Err <- err
+					continue
+				}
+
+			}
 
 		default:
 			panic("unknown actor message")
@@ -846,6 +916,216 @@ func (a *SymbolActor) Run() {
 	}
 }
 
-func (a *SymbolActor) PublishKafkaEvents(events []EngineEvent) {
+func (a *SymbolActor) ReplyWal(from uint64) error {
+	logs, err := a.wal.ReadFromToLast(from)
+	if err != nil {
+		return err
+	}
 
+	for _, log := range logs {
+		var logData pb.EngineEvent
+
+		if err := proto.Unmarshal(log.GetData(), &logData); err != nil {
+			return err
+		}
+
+		switch logData.EventType {
+		case pbTypes.EventType_ORDER_ACCEPTED:
+			var event pb.OrderStatusEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := &Order{
+				Symbol:        event.Symbol,
+				Status:        event.Status,
+				UserID:        event.UserId,
+				ClientOrderID: event.OrderId,
+				Side:          event.Side,
+				Type:          event.Type,
+
+				Price:         event.Price,
+				AveragePrice:  event.AveragePrice,
+				ExecutedValue: event.ExecutedValue,
+
+				Quantity:          event.Quantity,
+				FilledQuantity:    event.FilledQuantity,
+				RemainingQuantity: event.RemainingQuantity,
+				CancelledQuantity: event.CancelledQuantity,
+
+				ClientTimestamp:  event.ClientTimestamp,
+				GatewayTimestamp: event.GatewayTimestamp,
+				EngineTimestamp:  event.EngineTimestamp,
+			}
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			priceLevel := obs.GetOrCreatePriceLevel(order.Price)
+			priceLevel.Push(order)
+			a.engine.AllOrders[order.ClientOrderID] = order
+
+		case pbTypes.EventType_TRADE_EXECUTED:
+			var event pb.TradeEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			buyOrder := a.engine.AllOrders[event.BuyOrderId]
+			sellOrder := a.engine.AllOrders[event.SellOrderId]
+
+			restingOrder := sellOrder
+			order := buyOrder
+
+			if event.IsBuyerMaker {
+				restingOrder = buyOrder
+				order = sellOrder
+			}
+
+			restingOrder.RemainingQuantity -= event.Quantity
+			order.RemainingQuantity -= event.Quantity
+
+			restingOrder.FilledQuantity += event.Quantity
+			order.FilledQuantity += event.Quantity
+
+			restingOrder.ExecutedValue += event.Price * event.Quantity
+			order.ExecutedValue += event.Price * event.Quantity
+
+			restingOrder.AveragePrice = restingOrder.ExecutedValue / restingOrder.FilledQuantity
+			order.AveragePrice = order.ExecutedValue / order.FilledQuantity
+
+			a.engine.TotalMatches++
+			a.engine.TotalVolume += uint64(event.Quantity)
+			a.engine.TradeSequence++
+
+			if restingOrder.RemainingQuantity == 0 {
+				restingOrder.Status = pbTypes.OrderStatus_FILLED
+				obs := a.engine.Asks
+				if restingOrder.Side == pbTypes.Side_BUY {
+					obs = a.engine.Bids
+				}
+				level := obs.PriceLevels[order.Price]
+
+				level.Remove(restingOrder)
+				delete(a.engine.AllOrders, restingOrder.ClientOrderID)
+
+				if level.IsEmpty() {
+					obs.RemovePriceLevel(level)
+				}
+
+			} else {
+				restingOrder.Status = pbTypes.OrderStatus_PARTIAL_FILLED
+			}
+
+			if order.RemainingQuantity == 0 {
+				order.Status = pbTypes.OrderStatus_FILLED
+				obs := a.engine.Asks
+				if order.Side == pbTypes.Side_BUY {
+					obs = a.engine.Bids
+				}
+				level := obs.PriceLevels[order.Price]
+
+				level.Remove(order)
+				delete(a.engine.AllOrders, order.ClientOrderID)
+
+				if level.IsEmpty() {
+					obs.RemovePriceLevel(level)
+				}
+			} else {
+				order.Status = pbTypes.OrderStatus_PARTIAL_FILLED
+			}
+
+		case pbTypes.EventType_ORDER_CANCELLED:
+			var event pb.OrderStatusEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := a.engine.AllOrders[event.OrderId]
+			level := order.PriceLevel
+
+			order.CancelledQuantity = event.CancelledQuantity
+			order.RemainingQuantity = event.RemainingQuantity
+			order.FilledQuantity = event.FilledQuantity
+
+			order.Status = pbTypes.OrderStatus_CANCELLED
+
+			level.Remove(order)
+			delete(a.engine.AllOrders, order.ClientOrderID)
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			if level.IsEmpty() {
+				obs.RemovePriceLevel(level)
+			}
+
+		case pbTypes.EventType_ORDER_REDUCED:
+			var event pb.OrderReducedEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := a.engine.AllOrders[event.Order.OrderId]
+			level := order.PriceLevel
+
+			order.Quantity = event.NewQuantity
+			order.RemainingQuantity = event.NewRemainingQuantity
+
+			volumeDelta := event.OldRemainingQuantity - event.NewRemainingQuantity
+			order.PriceLevel.TotalVolume -= uint64(volumeDelta)
+
+			if order.RemainingQuantity == 0 {
+				level.Remove(order)
+				delete(a.engine.AllOrders, order.ClientOrderID)
+
+				obs := a.engine.Asks
+				if order.Side == pbTypes.Side_BUY {
+					obs = a.engine.Bids
+				}
+
+				if level.IsEmpty() {
+					obs.RemovePriceLevel(level)
+				}
+			}
+
+		case pbTypes.EventType_ORDER_REJECTED:
+			// TODO: Complete this
+
+		case pbTypes.EventType_ORDER_FILLED:
+			var event pb.OrderReducedEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order := a.engine.AllOrders[event.Order.OrderId]
+			level := order.PriceLevel
+
+			level.Remove(order)
+			delete(a.engine.AllOrders, order.ClientOrderID)
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			if level.IsEmpty() {
+				obs.RemovePriceLevel(level)
+			}
+
+		default:
+			continue
+		}
+	}
+
+	return nil
 }

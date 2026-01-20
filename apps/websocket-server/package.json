@@ -1,0 +1,14 @@
+{
+  "name": "@repo/websocket-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "",
+  "scripts": {
+    "dev": "make post-install && make dev",
+    "build": "make post-install && make build",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

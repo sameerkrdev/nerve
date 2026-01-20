@@ -2,9 +2,7 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
 	// "log/slog"
@@ -18,8 +16,6 @@ type Server struct {
 }
 
 func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
-	// slog.Info("Place Order:", in)
-
 	order := &Order{
 		Symbol:            req.Symbol,
 		Price:             req.Price,
@@ -44,8 +40,6 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		return nil, err
 	}
 
-	fmt.Println(res.Order, res.Trades)
-
 	return &pb.PlaceOrderResponse{
 		ClientOrderId:     res.Order.ClientOrderID,
 		Symbol:            res.Order.Symbol,
@@ -61,7 +55,7 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		Type:              res.Order.Type,
 		UserId:            res.Order.UserID,
 
-		AuctionNumber:    strconv.FormatUint(uint64(res.Order.OrderSequence), 10),
+		AuctionNumber:    "0",
 		ClientTimestamp:  res.Order.ClientTimestamp,
 		GatewayTimestamp: res.Order.GatewayTimestamp,
 	}, nil
@@ -99,4 +93,15 @@ func (s *Server) ModifyOrder(ctx context.Context, req *pb.ModifyOrderRequest) (*
 		Status:        res.Status,
 		StatusMessage: res.StatusMessage,
 	}, nil
+}
+
+func (s *Server) SubscribeSymbol(req *pb.SubscribeRequest, stream pb.MatchingEngine_SubscribeSymbolServer) error {
+	symbol := req.Symbol
+	gatewayId := req.GatewayId
+
+	if err := SubscribeSymbol(symbol, gatewayId, stream); err != nil {
+		return err
+	}
+
+	return nil
 }

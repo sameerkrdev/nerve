@@ -1,0 +1,27 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/websocket-server ./cmd/websocket-server"
+bin = "tmp/websocket-server"
+
+include_ext = ["go"]
+
+include_dir = [
+  ".",
+  "../../packages/proto-defs/go/generated"
+]
+
+exclude_dir = [
+  "tmp",
+  "vendor",
+  "node_modules"
+]
+
+delay = 200
+
+[run]
+cmd = "./tmp/websocket-server"
+
+[log]
+time = true

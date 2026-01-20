@@ -32,11 +32,13 @@ func main() {
 
 	pb.RegisterMatchingEngineServer(grpcServer, matchingEngineServer)
 
-	internal.StartActors([]string{
-		"BTCUSD",
-		"ETHUSD",
-		"SOLUSD",
-	})
+	symbols := []internal.Symbol{
+		{Name: "BTCUSD", StartingPrice: 90_000, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 400, WalShouldFsync: true, KafkaBatchSize: 300, KafkaEmitMM: 200},
+		{Name: "SOLUSD", StartingPrice: 150, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 400, WalShouldFsync: true, KafkaBatchSize: 300, KafkaEmitMM: 200},
+		{Name: "ETHUSD", StartingPrice: 3_510, MaxWalFileSize: 67_108_864, WalDir: "wal", WalSyncInterval: 400, WalShouldFsync: true, KafkaBatchSize: 300, KafkaEmitMM: 200},
+	}
+
+	internal.StartActors(symbols)
 
 	log.Printf("gRPC server listening at %v", lis.Addr())
 	if err := grpcServer.Serve(lis); err != nil {

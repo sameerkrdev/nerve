@@ -1,14 +1,46 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"log/slog"
+
+	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
+)
+
+type Symbol struct {
+	Name            string
+	StartingPrice   int64
+	MaxWalFileSize  int
+	WalDir          string
+	WalSyncInterval int
+	WalShouldFsync  bool
+	KafkaBatchSize  int
+	KafkaEmitMM     int
+}
 
 var actors = map[string]*SymbolActor{}
 
-func StartActors(symbols []string) {
+func StartActors(symbols []Symbol) {
 	for _, sym := range symbols {
-		actor := NewSymbolActor(sym, 8192)
-		actors[sym] = actor
+		actor, err := NewSymbolActor(sym, 8192)
+		if err != nil {
+			log.Fatalln("Failed to start actor", symbols, err)
+		}
+
+		// 1. Load snapshot (if exists)
+		// 2. Replay WAL (blocking)
+		actor.ReplyWal(0)
+
+		// 3. Start other workers owned by actor
+		go actor.wal.keepSyncing()
+		go actor.kafkaEmitter.Run()
+		// go actor.snapshotWorker()
+
+		// 4. Start actor loop LAST
 		go actor.Run()
+
+		actors[sym.Name] = actor
 	}
 }
 
@@ -92,4 +124,31 @@ func ModifyOrder(
 	case err := <-errCh:
 		return nil, err
 	}
+}
+
+func SubscribeSymbol(symbol string, gatewayId string, stream pb.MatchingEngine_SubscribeSymbolServer) error {
+	actor, ok := actors[symbol]
+	if !ok {
+		return fmt.Errorf("unknown symbol %s", symbol)
+	}
+
+	actor.mu.Lock()
+	actor.grpcStreams = append(actor.grpcStreams, stream)
+	actor.mu.Unlock()
+	slog.Info(fmt.Sprintf("Gateway %s subscribed to %s via dedicated stream", gatewayId, symbol))
+
+	<-stream.Context().Done()
+
+	for i, s := range actor.grpcStreams {
+		if s == stream {
+			actor.mu.Lock()
+			actor.grpcStreams = append(actor.grpcStreams[:i], actor.grpcStreams[i+1:]...)
+			actor.mu.Unlock()
+			break
+		}
+	}
+
+	slog.Info(fmt.Sprintf("Gateway %s unsubscribed to %s", gatewayId, symbol))
+
+	return nil
 }

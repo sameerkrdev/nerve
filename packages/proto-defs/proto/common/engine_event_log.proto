@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package common.order;
+
+option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common/order";
+
+message WAL_Entry {
+    uint64  sequence_number = 1;
+    bytes   data = 2;
+    uint32  CRC = 3;
+ 
+    // Optional field for checkpointing.
+    optional bool is_checkpoint = 5;
+}
