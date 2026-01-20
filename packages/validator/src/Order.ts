@@ -45,7 +45,7 @@ export const ModifyOrderValidator = z.object({
     .object({
       symbol: z.string().trim(),
 
-      newPrice: z.number().int().positive().optional(),
+      newPrice: z.number().positive().optional(),
       newQuantity: z.number().int().positive().optional(),
     })
     .refine(
