@@ -854,7 +854,11 @@ func (a *SymbolActor) Run() {
 					continue
 				}
 
-				for _, stream := range a.grpcStreams {
+				a.mu.RLock()
+				streams := make([]pb.MatchingEngine_SubscribeSymbolServer, len(a.grpcStreams))
+				copy(streams, a.grpcStreams)
+				a.mu.RUnlock()
+				for _, stream := range streams {
 					stream.Send(event)
 				}
 
@@ -873,7 +877,6 @@ func (a *SymbolActor) Run() {
 				m.Err <- err
 				continue
 			}
-			m.Reply <- response
 
 			for _, event := range events {
 				data, err := proto.Marshal(event)
@@ -881,11 +884,22 @@ func (a *SymbolActor) Run() {
 					m.Err <- err
 					continue
 				}
+
+				a.mu.RLock()
+				streams := make([]pb.MatchingEngine_SubscribeSymbolServer, len(a.grpcStreams))
+				copy(streams, a.grpcStreams)
+				a.mu.RUnlock()
+				for _, stream := range streams {
+					stream.Send(event)
+				}
+
 				if err := a.wal.writeEntry(data); err != nil {
 					m.Err <- err
 					continue
 				}
 			}
+
+			m.Reply <- response
 
 		case ModifyOrderMsg:
 			response, events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
@@ -894,7 +908,6 @@ func (a *SymbolActor) Run() {
 				m.Err <- err
 				continue
 			}
-			m.Reply <- response
 
 			for _, event := range events {
 				data, err := proto.Marshal(event)
@@ -902,12 +915,23 @@ func (a *SymbolActor) Run() {
 					m.Err <- err
 					continue
 				}
+
+				a.mu.RLock()
+				streams := make([]pb.MatchingEngine_SubscribeSymbolServer, len(a.grpcStreams))
+				copy(streams, a.grpcStreams)
+				a.mu.RUnlock()
+				for _, stream := range streams {
+					stream.Send(event)
+				}
+
 				if err := a.wal.writeEntry(data); err != nil {
 					m.Err <- err
 					continue
 				}
 
 			}
+
+			m.Reply <- response
 
 		default:
 			panic("unknown actor message")
@@ -978,6 +1002,11 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			buyOrder := a.engine.AllOrders[event.BuyOrderId]
 			sellOrder := a.engine.AllOrders[event.SellOrderId]
 
+			if buyOrder == nil || sellOrder == nil {
+				return fmt.Errorf("trade replay: order not found (buy=%s, sell=%s)",
+					event.BuyOrderId, event.SellOrderId)
+			}
+
 			restingOrder := sellOrder
 			order := buyOrder
 
@@ -1008,7 +1037,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 				if restingOrder.Side == pbTypes.Side_BUY {
 					obs = a.engine.Bids
 				}
-				level := obs.PriceLevels[order.Price]
+				level := obs.PriceLevels[restingOrder.Price]
 
 				level.Remove(restingOrder)
 				delete(a.engine.AllOrders, restingOrder.ClientOrderID)

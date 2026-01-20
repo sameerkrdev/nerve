@@ -80,7 +80,7 @@ func EncodeTradeEvent(trade *Trade) ([]byte, error) {
 		TradeSequence: trade.TradeSequence,
 		Price:         trade.Price,
 		Quantity:      trade.Quantity,
-		BuyerId:       trade.BuyOrderID,
+		BuyerId:       trade.BuyerID,
 		SellerId:      trade.SellerID,
 		BuyOrderId:    trade.BuyOrderID,
 		SellOrderId:   trade.SellOrderID,

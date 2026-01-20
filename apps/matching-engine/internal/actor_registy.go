@@ -139,14 +139,14 @@ func SubscribeSymbol(symbol string, gatewayId string, stream pb.MatchingEngine_S
 
 	<-stream.Context().Done()
 
+	actor.mu.Lock()
 	for i, s := range actor.grpcStreams {
 		if s == stream {
-			actor.mu.Lock()
 			actor.grpcStreams = append(actor.grpcStreams[:i], actor.grpcStreams[i+1:]...)
-			actor.mu.Unlock()
 			break
 		}
 	}
+	actor.mu.Unlock()
 
 	slog.Info(fmt.Sprintf("Gateway %s unsubscribed to %s", gatewayId, symbol))
 
