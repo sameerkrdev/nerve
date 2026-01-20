@@ -57,10 +57,10 @@ class KafkaClient {
     this.log.info(`Message sent -> ${topic}`, { key, payload });
   }
 
-  async subscribe<T>(
+  async subscribe<T, X>(
     groupId: string,
     topic: string,
-    handler: (message: T, topic: string, partition: number) => Promise<void>,
+    handler: (message: T, topic: string, partition: number, headers: X) => Promise<void>,
     schema?: z.ZodTypeAny,
   ) {
     const consumer = await this.createConsumer(groupId);
@@ -78,7 +78,12 @@ class KafkaClient {
           const parsed = JSON.parse(raw);
           const payload = schema ? schema.parse(parsed) : parsed;
 
-          await handler(payload, topic, partition);
+          const headers: Record<string, string> = {};
+          for (const [k, v] of Object.entries(message.headers || {})) {
+            headers[k] = v ? v?.toString("utf-8") : "";
+          }
+
+          await handler(payload, topic, partition, headers as X);
 
           await consumer.commitOffsets([
             {

@@ -1,21 +1,32 @@
-import {
-  OrderSideEnumStringMap,
-  OrderStatusEnumStringMap,
-  OrderTypeEnumStringMap,
-} from "@/constants";
 import type { Logger } from "@repo/logger";
 import { type OrderRepository } from "@repo/prisma";
 import type { OrderSide, OrderStatus, OrderType } from "@repo/prisma/";
-import type { CreateOrderRequest } from "@repo/proto-defs/ts/api/order_service";
-import type { OrderStatus as Status } from "@repo/proto-defs/ts/common/order_types";
 
 export class OrderServerController {
   constructor(
     private readonly logger: Logger,
-    private orderRepo?: OrderRepository,
+    private orderRepo: OrderRepository,
   ) {}
 
-  async createOrder(data: CreateOrderRequest & { id: string; status: Status; eventType: string }) {
+  async createOrder(data: {
+    id: string;
+    side: OrderSide;
+    type: OrderType;
+    userId: string;
+    status: OrderStatus;
+    statusMessage: string | undefined;
+    symbol: string;
+    price: number;
+    executedValue: number;
+    quantity: number;
+    averagePrice: number;
+    filledQuantity: number;
+    cancelledQuantity: number;
+    remainingQuantity: number;
+    gatewayTimestamp?: Date | undefined;
+    clientTimestamp?: Date | undefined;
+    engineTimestamp?: Date | undefined;
+  }) {
     try {
       if (!this.orderRepo) {
         this.logger.warn("OrderRepository not provided, skipping order persistence");
@@ -24,9 +35,9 @@ export class OrderServerController {
 
       const newOrder = await this.orderRepo.create({
         id: data.id,
-        side: OrderSideEnumStringMap[data.side] as OrderSide,
-        type: OrderTypeEnumStringMap[data.type] as OrderType,
-        status: OrderStatusEnumStringMap[data.status] as OrderStatus,
+        side: data.side,
+        type: data.type,
+        status: data.status,
         user: { connect: { id: data.userId } },
         symbol: data.symbol,
         price: data.price,

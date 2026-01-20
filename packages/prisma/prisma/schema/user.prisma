@@ -10,9 +10,8 @@ model User {
     updated_at DateTime @updatedAt
 
     // Relations
-    orders       Order[]
-    maker_trades Trade[] @relation("MakerUserTrades")
-    taker_trades Trade[] @relation("TakerUserTrades")
+    orders Order[]
+    trades Trade[]
 
     @@map("users")
 }

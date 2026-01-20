@@ -2,41 +2,19 @@ model Trade {
     id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
     // Trade details
-    symbol   String
-    price    Decimal @db.Decimal(20, 8)
-    quantity Decimal @db.Decimal(20, 8)
+    symbol         String
+    price          Int
+    quantity       Int
+    trade_sequence Int
 
-    // Order references
-    maker_order_id String @db.Uuid
-    taker_order_id String @db.Uuid
+    sell_orde     Order?  @relation(fields: [sell_order_id], references: [id])
+    sell_order_id String? @db.Uuid
 
-    maker_order Order @relation("MakerOrderTrades", fields: [maker_order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    taker_order Order @relation("TakerOrderTrades", fields: [taker_order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    buy_order    Order?  @relation(fields: [buy_order_id], references: [id])
+    buy_order_id String? @db.Uuid
 
-    // User references (denormalized for quick access)
-    maker_user_id String @db.Uuid
-    taker_user_id String @db.Uuid
+    user    User?   @relation(fields: [user_id], references: [id])
+    user_id String? @db.Uuid
 
-    maker_user User @relation("MakerUserTrades", fields: [maker_user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    taker_user User @relation("TakerUserTrades", fields: [taker_user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-    // Trade sides
-    maker_side OrderSide // BUY or SELL
-    taker_side OrderSide // Opposite of maker_side
-
-    // Fees
-    maker_fee Decimal @default(0) @db.Decimal(20, 8)
-    taker_fee Decimal @default(0) @db.Decimal(20, 8)
-
-    // Timestamp
-    executed_at DateTime @default(now())
-
-    // Indexes
-    @@index([symbol, executed_at])
-    @@index([maker_order_id])
-    @@index([taker_order_id])
-    @@index([maker_user_id])
-    @@index([taker_user_id])
-    @@index([executed_at])
     @@map("trades")
 }
