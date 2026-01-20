@@ -208,7 +208,6 @@ func (obs *OrderBookSide) RemovePriceLevel(level *PriceLevel) {
 ================== Single Symbol Matching Engine Management =====================
 =================================================================================
 */
-
 type MatchingEngine struct {
 	Symbol string
 	Bids   *OrderBookSide
@@ -620,26 +619,26 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	newOrderID string, // required ONLY for replace
 	newPrice *int64,
 	newQuantity *int64,
-) (*ModifyOrderInternalResponse, []EngineEvent, error) {
+) ([]EngineEvent, error) {
 
 	order, ok := me.AllOrders[oldOrderID]
 	if !ok {
-		return nil, nil, fmt.Errorf("order not found")
+		return nil, fmt.Errorf("order not found")
 	}
 	if order.UserID != userID {
-		return nil, nil, fmt.Errorf("unauthorized")
+		return nil, fmt.Errorf("unauthorized")
 	}
 	if order.Symbol != symbol {
-		return nil, nil, fmt.Errorf("symbol mismatch")
+		return nil, fmt.Errorf("symbol mismatch")
 	}
 	if order.Status == pbTypes.OrderStatus_FILLED || order.Status == pbTypes.OrderStatus_CANCELLED {
-		return nil, nil, fmt.Errorf("order not modifiable")
+		return nil, fmt.Errorf("order not modifiable")
 	}
 
 	executed := order.Quantity - order.RemainingQuantity
 
 	if newQuantity != nil && *newQuantity < executed {
-		return nil, nil, fmt.Errorf("new quantity < executed quantity")
+		return nil, fmt.Errorf("new quantity < executed quantity")
 	}
 
 	newRemaining := order.RemainingQuantity
@@ -654,28 +653,15 @@ func (me *MatchingEngine) ModifyOrderInternal(
 	switch {
 	case priceChanged || qtyIncreased:
 		if _, exists := me.AllOrders[newOrderID]; exists {
-			return nil, nil, fmt.Errorf("new_order_id already exists")
+			return nil, fmt.Errorf("new_order_id already exists")
 		}
-		events, err := me.replaceOrder(order, newOrderID, newPrice, newQuantity)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		response := &ModifyOrderInternalResponse{OrderID: order.ClientOrderID, OldOrderId: order.ClientOrderID, NewOrderId: newOrderID, Status: "Success"}
-		return response, events, nil
+		return me.replaceOrder(order, newOrderID, newPrice, newQuantity)
 
 	case qtyReduced:
-
-		events, err := me.reduceOrder(order, newQuantity)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		response := &ModifyOrderInternalResponse{OrderID: order.ClientOrderID, OldOrderId: "", NewOrderId: "", Status: "Success"}
-		return response, events, nil
+		return me.reduceOrder(order, newQuantity)
 
 	default:
-		return nil, nil, nil
+		return nil, nil
 	}
 }
 
@@ -697,11 +683,6 @@ func (me *MatchingEngine) reduceOrder(
 
 	order.Quantity = *newQuantity
 	order.RemainingQuantity = newRemaining
-
-	if order.PriceLevel != nil {
-		volumeDelta := order.RemainingQuantity - newRemaining
-		order.PriceLevel.TotalVolume -= uint64(volumeDelta)
-	}
 
 	// snapshot update (NO semantic meaning here)
 	return []EngineEvent{
@@ -730,7 +711,6 @@ func (me *MatchingEngine) replaceOrder(
 ) ([]EngineEvent, error) {
 
 	var events []EngineEvent
-	executed := order.Quantity - order.RemainingQuantity
 
 	// ---------- cancel old ----------
 	_, cancelEvents, err := me.CancelOrderInternal(
@@ -742,6 +722,8 @@ func (me *MatchingEngine) replaceOrder(
 		return nil, err
 	}
 	events = append(events, cancelEvents...)
+
+	executed := order.Quantity - order.RemainingQuantity
 
 	price := order.Price
 	if newPrice != nil {
@@ -813,18 +795,13 @@ type SymbolActor struct {
 	symbol string
 	inbox  chan EngineMsg
 	engine *MatchingEngine
-
-	wal *SymbolWAL
 }
 
-func NewSymbolActor(symbol Symbol, buffer int) *SymbolActor {
-	wal, _ := OpenWAL(symbol.WalDir, symbol.Name, int64(symbol.MaxWalFileSize), symbol.WalShouldFsync, symbol.WalSyncInterval)
-
+func NewSymbolActor(symbol string, buffer int) *SymbolActor {
 	return &SymbolActor{
-		symbol: symbol.Name,
+		symbol: symbol,
 		inbox:  make(chan EngineMsg, buffer),
-		engine: NewMatchingEngine(symbol.Name),
-		wal:    wal,
+		engine: NewMatchingEngine(symbol),
 	}
 }
 
@@ -852,13 +829,13 @@ func (a *SymbolActor) Run() {
 
 			a.PublishKafkaEvents(events)
 		case ModifyOrderMsg:
-			response, events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
+			events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
 
 			if err != nil {
 				m.Err <- err
 				continue
 			}
-			m.Reply <- response
+			// m.Reply <- response
 
 			a.PublishKafkaEvents(events)
 
