@@ -476,6 +476,22 @@ func (me *MatchingEngine) buildEvents(
 			UserId:    order.UserID,
 			Data:      tradeData,
 		})
+
+		depth, err := me.getDepthEvent()
+		if err == nil {
+			events = append(events, depth)
+		}
+		if depth == nil {
+			fmt.Printf("%s", err.Error())
+		}
+
+		tikcer, _ := me.getTickerEvent(trade.Price, me.Bids.BestPriceLevel.Price, me.Asks.BestPriceLevel.Price)
+		if err != nil {
+			events = append(events, tikcer)
+		}
+		if tikcer == nil {
+			fmt.Printf("%s", err.Error())
+		}
 	}
 
 	// ---------- FINAL STATE ----------
@@ -557,6 +573,14 @@ func (me *MatchingEngine) CancelOrderInternal(
 		UserId:    order.UserID,
 		Data:      data,
 	})
+
+	depth, err := me.getDepthEvent()
+	if err == nil {
+		events = append(events, depth)
+	}
+	if depth == nil {
+		fmt.Printf("%s", err.Error())
+	}
 
 	return &CancelOrderInternalResponse{
 		ID:     order.ClientOrderID,
@@ -696,6 +720,14 @@ func (me *MatchingEngine) reduceOrder(
 			Data:      event,
 		})
 
+		depth, err := me.getDepthEvent()
+		if err == nil {
+			events = append(events, depth)
+		}
+		if depth == nil {
+			fmt.Printf("%s", err.Error())
+		}
+
 	} else {
 		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining)
 		if err != nil {
@@ -706,6 +738,14 @@ func (me *MatchingEngine) reduceOrder(
 			UserId:    order.UserID,
 			Data:      event,
 		})
+
+		depth, err := me.getDepthEvent()
+		if err == nil {
+			events = append(events, depth)
+		}
+		if depth == nil {
+			fmt.Printf("%s", err.Error())
+		}
 	}
 
 	return events, nil
@@ -847,6 +887,18 @@ func (a *SymbolActor) Run() {
 				continue
 			}
 
+			// depthEvent, err := a.getDepthEvent()
+			// if err != nil {
+			// 	fmt.Printf("%s", err.Error())
+			// }
+			// events = append(events, depthEvent)
+
+			// tickerEvent, err := a.getTickerEvent()
+			// if err != nil {
+			// 	fmt.Printf("%s", err.Error())
+			// }
+			// events = append(events, depthEvent)
+
 			for _, event := range events {
 				data, err := proto.Marshal(event)
 				if err != nil {
@@ -860,6 +912,10 @@ func (a *SymbolActor) Run() {
 				a.mu.RUnlock()
 				for _, stream := range streams {
 					stream.Send(event)
+				}
+
+				if event.EventType == pbTypes.EventType_DEPTH || event.EventType == pbTypes.EventType_TICKER {
+					continue
 				}
 
 				if err := a.wal.WriteEntry(data); err != nil {
@@ -893,6 +949,10 @@ func (a *SymbolActor) Run() {
 					stream.Send(event)
 				}
 
+				if event.EventType == pbTypes.EventType_DEPTH || event.EventType == pbTypes.EventType_TICKER {
+					continue
+				}
+
 				if err := a.wal.writeEntry(data); err != nil {
 					m.Err <- err
 					continue
@@ -924,6 +984,10 @@ func (a *SymbolActor) Run() {
 					stream.Send(event)
 				}
 
+				if event.EventType == pbTypes.EventType_DEPTH || event.EventType == pbTypes.EventType_TICKER {
+					continue
+				}
+
 				if err := a.wal.writeEntry(data); err != nil {
 					m.Err <- err
 					continue
@@ -938,6 +1002,88 @@ func (a *SymbolActor) Run() {
 		}
 
 	}
+}
+
+func (me *MatchingEngine) getDepthEvent() (*pb.EngineEvent, error) {
+	depthLevel := 100
+	bids := make([]*pb.PriceLevel, 0, depthLevel)
+	asks := make([]*pb.PriceLevel, 0, depthLevel)
+
+	for i := 1; i < depthLevel; i++ {
+		temp := me.Bids.BestPriceLevel
+		if temp == nil {
+			break
+		}
+
+		level := &pb.PriceLevel{
+			Price:      temp.Price,
+			OrderCount: int64(temp.OrderCount),
+			Quantity:   int64(temp.TotalVolume),
+		}
+		bids = append(bids, level)
+		temp = temp.NextPrice
+		if temp.NextPrice == nil {
+			break
+		}
+	}
+	for i := 1; i < depthLevel; i++ {
+		temp := me.Asks.BestPriceLevel
+		if temp == nil {
+			break
+		}
+
+		level := &pb.PriceLevel{
+			Price:      temp.Price,
+			OrderCount: int64(temp.OrderCount),
+			Quantity:   int64(temp.TotalVolume),
+		}
+		bids = append(bids, level)
+		temp = temp.NextPrice
+		if temp.NextPrice == nil {
+			break
+		}
+	}
+
+	depth := &pb.DepthEvent{
+		Symbol:    me.Symbol,
+		Sequence:  int64(me.TradeSequence),
+		Timestamp: timestamppb.Now(),
+		Bids:      bids,
+		Asks:      asks,
+	}
+
+	dataByte, err := proto.Marshal(depth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to emit depth event of symbol:%s", me.Symbol)
+	}
+
+	event := &pb.EngineEvent{
+		EventType: pbTypes.EventType_DEPTH,
+		Data:      dataByte,
+	}
+
+	return event, nil
+}
+
+func (me *MatchingEngine) getTickerEvent(lastPrice int64, bidPrice int64, askPrice int64) (*pb.EngineEvent, error) {
+	ticker := &pb.TickerEvent{
+		Symbol:    me.Symbol,
+		LastPrice: lastPrice,
+		BidPrice:  bidPrice,
+		AskPrice:  askPrice,
+	}
+
+	byteData, err := proto.Marshal(ticker)
+	if err != nil {
+		return nil, fmt.Errorf("failed to emit ticker event of symbol:%s", me.Symbol)
+	}
+
+	event := &pb.EngineEvent{
+		EventType: pbTypes.EventType_TICKER,
+		Data:      byteData,
+	}
+
+	return event, nil
 }
 
 func (a *SymbolActor) ReplyWal(from uint64) error {
@@ -1127,7 +1273,30 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			}
 
 		case pbTypes.EventType_ORDER_REJECTED:
-			// TODO: Complete this
+			var event pb.OrderStatusEvent
+
+			if err := proto.Unmarshal(log.GetData(), &event); err != nil {
+				return err
+			}
+
+			order, exists := a.engine.AllOrders[event.OrderId]
+			if !exists {
+				continue
+			}
+
+			level := order.PriceLevel
+
+			level.Remove(order)
+			delete(a.engine.AllOrders, order.ClientOrderID)
+
+			obs := a.engine.Asks
+			if order.Side == pbTypes.Side_BUY {
+				obs = a.engine.Bids
+			}
+
+			if level.IsEmpty() {
+				obs.RemovePriceLevel(level)
+			}
 
 		case pbTypes.EventType_ORDER_FILLED:
 			var event pb.OrderReducedEvent
