@@ -163,7 +163,7 @@ export class OrderServerController {
         );
       });
 
-      this.logger.info("Order Cancelled successfully", {
+      this.logger.info("Order modified successfully", {
         ...response,
         engineStatus: response.status,
       });

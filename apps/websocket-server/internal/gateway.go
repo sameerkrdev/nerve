@@ -293,7 +293,6 @@ func (u *User) writePump() {
 	for {
 		select {
 		case event, ok := <-u.Channel:
-			// todo: channel has event type property so that to determine the type and unmashal the data and send it to client
 			u.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 
 			if !ok {

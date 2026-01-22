@@ -38,7 +38,7 @@ func EncodeOrderStatusEvent(order *Order, statusMessage *string) ([]byte, error)
 	return eventByte, nil
 }
 
-func EncodeOrderReducedEvent(order *Order, oldQuantity int64, oldRemainingQuantiy int64) ([]byte, error) {
+func EncodeOrderReducedEvent(order *Order, oldQuantity int64, oldRemainingQuantiy int64, newCancelledQuantity int64, oldCancelledQuantity int64) ([]byte, error) {
 	eventByte, err := proto.Marshal(&pb.OrderReducedEvent{
 		Order: &pb.OrderStatusEvent{
 			OrderId: order.ClientOrderID,
@@ -65,6 +65,8 @@ func EncodeOrderReducedEvent(order *Order, oldQuantity int64, oldRemainingQuanti
 		NewQuantity:          order.Quantity,
 		OldRemainingQuantity: oldRemainingQuantiy,
 		NewRemainingQuantity: order.RemainingQuantity,
+		OldCancelledQuantity: oldCancelledQuantity,
+		NewCancelledQuantity: newCancelledQuantity,
 	})
 	if err != nil {
 		return nil, err
@@ -80,7 +82,7 @@ func EncodeTradeEvent(trade *Trade) ([]byte, error) {
 		TradeSequence: trade.TradeSequence,
 		Price:         trade.Price,
 		Quantity:      trade.Quantity,
-		BuyerId:       trade.BuyOrderID,
+		BuyerId:       trade.BuyerID,
 		SellerId:      trade.SellerID,
 		BuyOrderId:    trade.BuyOrderID,
 		SellOrderId:   trade.SellOrderID,

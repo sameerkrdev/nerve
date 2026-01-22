@@ -54,7 +54,7 @@ func NewKafkaProducerWorker(symbol string, dirPath string, wal *SymbolWAL, batch
 		return nil, err
 	}
 
-	file, err := os.OpenFile(filepath.Join(dirPath, symbol, "checkpoint.meta"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile(filepath.Join(dirPath, symbol, "checkpoint.meta"), os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}

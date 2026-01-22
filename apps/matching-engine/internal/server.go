@@ -82,7 +82,7 @@ func (s *Server) ModifyOrder(ctx context.Context, req *pb.ModifyOrderRequest) (*
 	res, err := ModifyOrder(req.Symbol, req.OrderId, req.UserId, req.ClientModifyId, req.NewPrice, req.NewQuantity)
 
 	if err != nil {
-		slog.Error("Failed to cancel order")
+		slog.Error("Failed to modify order")
 		return nil, err
 	}
 
