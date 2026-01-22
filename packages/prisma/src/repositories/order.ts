@@ -20,8 +20,8 @@ export class OrderRepository {
       where: { id },
       include: {
         user: true,
-        maker_trades: true,
-        taker_trades: true,
+        buyTrades: true,
+        sellTrades: true,
       },
     });
   }

@@ -20,5 +20,8 @@ model Trade {
     seller    User?   @relation("SellerRelation", fields: [seller_id], references: [id])
     seller_id String? @db.Uuid
 
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
     @@map("trades")
 }
