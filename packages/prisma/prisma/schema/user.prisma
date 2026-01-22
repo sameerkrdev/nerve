@@ -11,7 +11,9 @@ model User {
 
     // Relations
     orders Order[]
-    trades Trade[]
+
+    sellTrades Trade[] @relation("SellerRelation")
+    buyTrades  Trade[] @relation("BuyerRelation")
 
     @@map("users")
 }

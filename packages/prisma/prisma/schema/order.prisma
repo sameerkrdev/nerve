@@ -21,7 +21,8 @@ model Order {
     user_id String @db.Uuid
     user    User   @relation(fields: [user_id], references: [id])
 
-    trades Trade[]
+    sellTrades Trade[] @relation("SellOrderRelation")
+    buyTrades  Trade[] @relation("BuyOrderRelation")
 
     gateway_timeline DateTime
     engine_timeline  DateTime

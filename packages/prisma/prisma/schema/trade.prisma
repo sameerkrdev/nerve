@@ -6,15 +6,19 @@ model Trade {
     price          Int
     quantity       Int
     trade_sequence Int
+    is_buyer_maker Boolean
 
-    sell_orde     Order?  @relation(fields: [sell_order_id], references: [id])
+    sell_order    Order?  @relation("SellOrderRelation", fields: [sell_order_id], references: [id])
     sell_order_id String? @db.Uuid
 
-    buy_order    Order?  @relation(fields: [buy_order_id], references: [id])
+    buy_order    Order?  @relation("BuyOrderRelation", fields: [buy_order_id], references: [id])
     buy_order_id String? @db.Uuid
 
-    user    User?   @relation(fields: [user_id], references: [id])
-    user_id String? @db.Uuid
+    buyer    User?   @relation("BuyerRelation", fields: [buyer_id], references: [id])
+    buyer_id String? @db.Uuid
+
+    seller    User?   @relation("SellerRelation", fields: [seller_id], references: [id])
+    seller_id String? @db.Uuid
 
     @@map("trades")
 }

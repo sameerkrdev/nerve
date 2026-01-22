@@ -682,14 +682,20 @@ func (me *MatchingEngine) reduceOrder(
 	if newRemaining < 0 {
 		return nil, fmt.Errorf("invalid reduce")
 	}
+	volumeDelta := oldRemaining - newRemaining
+
+	oldCancelledQuantity := order.CancelledQuantity
+	newCancelledQuantity := order.CancelledQuantity + volumeDelta
 
 	// apply mutation
-	order.Quantity = *newQuantity
+	// order.Quantity = *newQuantity
 	order.RemainingQuantity = newRemaining
+	order.CancelledQuantity += oldRemaining - newRemaining
+
+	order.CancelledQuantity = newCancelledQuantity
 
 	// update price level volume
 	if order.PriceLevel != nil {
-		volumeDelta := oldRemaining - newRemaining
 		order.PriceLevel.TotalVolume -= uint64(volumeDelta)
 	}
 
@@ -729,7 +735,7 @@ func (me *MatchingEngine) reduceOrder(
 		}
 
 	} else {
-		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining)
+		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining, newCancelledQuantity, oldCancelledQuantity)
 		if err != nil {
 			return nil, err
 		}
@@ -1252,8 +1258,9 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			order := a.engine.AllOrders[event.Order.OrderId]
 			level := order.PriceLevel
 
-			order.Quantity = event.NewQuantity
+			// order.Quantity = event.NewQuantity
 			order.RemainingQuantity = event.NewRemainingQuantity
+			order.CancelledQuantity += event.NewCancelledQuantity
 
 			volumeDelta := event.OldRemainingQuantity - event.NewRemainingQuantity
 			order.PriceLevel.TotalVolume -= uint64(volumeDelta)
@@ -1272,6 +1279,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 				}
 			}
 
+			// TODO: review this for partiall filled
 		case pbTypes.EventType_ORDER_REJECTED:
 			var event pb.OrderStatusEvent
 

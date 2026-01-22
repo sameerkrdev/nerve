@@ -8,21 +8,30 @@ import type { Logger } from "@repo/logger";
 import { logger } from "@repo/logger";
 import { OrderServerController } from "@/controllers/order.controller";
 import type { OrderSide, OrderStatus, OrderType } from "@repo/prisma";
+import { TradeRepository } from "@repo/prisma";
 import { OrderRepository } from "@repo/prisma";
 import env from "@/config/dotenv";
-import { EngineEvent, OrderStatusEvent } from "@repo/proto-defs/ts/engine/order_matching";
+import {
+  EngineEvent,
+  OrderReducedEvent,
+  OrderStatusEvent,
+  TradeEvent,
+} from "@repo/proto-defs/ts/engine/order_matching";
 import {
   EventType,
   orderStatusFromJSON,
   orderTypeFromJSON,
   sideFromJSON,
 } from "@repo/proto-defs/ts/common/order_types";
+import { TradeServerController } from "./controllers/trade.controller";
 
 class KafkaConsumer {
   private kafkaClient: KafkaClient;
   private orderController: OrderServerController;
+  private tradeController: TradeServerController;
   private logger: Logger = logger;
   private orderRepo: OrderRepository;
+  private tradeRepo: TradeRepository;
 
   constructor() {
     this.kafkaClient = new KafkaClient(
@@ -30,7 +39,9 @@ class KafkaConsumer {
       env.KAFKA_BROKERS.split(","),
     );
     this.orderRepo = new OrderRepository();
+    this.tradeRepo = new TradeRepository();
     this.orderController = new OrderServerController(this.logger, this.orderRepo);
+    this.tradeController = new TradeServerController(this.logger, this.tradeRepo);
   }
 
   async startConsuming(): Promise<void> {
@@ -66,14 +77,107 @@ class KafkaConsumer {
               price: data.price,
               remainingQuantity: data.remainingQuantity,
               executedValue: data.executedValue,
-              gatewayTimestamp: data.gatewayTimestamp,
-              clientTimestamp: data.clientTimestamp,
-              engineTimestamp: data.engineTimestamp,
+              gatewayTimestamp: data.gatewayTimestamp!,
+              clientTimestamp: data.clientTimestamp!,
+              engineTimestamp: data.engineTimestamp!,
               side: sideFromJSON(data.side) as unknown as OrderSide,
               type: orderTypeFromJSON(data.type) as unknown as OrderType,
               status: orderStatusFromJSON(data.status) as unknown as OrderStatus,
             });
 
+            break;
+          }
+
+          case EventType.TRADE_EXECUTED: {
+            this.logger.info(
+              `Processing trade excuted event for user: ${unmarshedEvent.userId} of symbol ${unmarshedEvent.symbol}`,
+            );
+
+            const data = TradeEvent.decode(unmarshedEvent.data);
+
+            // create trade
+            await this.tradeController.createTrade({
+              id: data.tradeId,
+              symbol: data.symbol,
+              price: data.price,
+              quantity: data.quantity,
+              tradeSequence: data.tradeSequence,
+              isBuyerMaker: data.isBuyerMaker,
+
+              sellerId: data.sellerId,
+              buyerId: data.buyerId,
+
+              sellOrderId: data.sellOrderId,
+              buyOrderId: data.buyOrderId,
+              timestamp: data.timestamp!,
+            });
+
+            // update maker and taker order detail
+            await this.orderController.updateOrderForTradeExcute({
+              id: data.buyOrderId,
+              price: data.price,
+              quantity: data.quantity,
+            });
+            await this.orderController.updateOrderForTradeExcute({
+              id: data.sellOrderId,
+              price: data.price,
+              quantity: data.quantity,
+            });
+
+            break;
+          }
+
+          case EventType.ORDER_REDUCED: {
+            this.logger.info(
+              `Processing order reduced event for user: ${unmarshedEvent.userId} of symbol ${unmarshedEvent.symbol}`,
+            );
+
+            const data = OrderReducedEvent.decode(unmarshedEvent.data);
+
+            if (!data.order) {
+              this.logger.error("Order id not found");
+              break;
+            }
+
+            // update maker and taker order detail
+            await this.orderController.updateOrderForQuantityReduced({
+              id: data.order.orderId,
+              newCancelledQuantity: data.newCancelledQuantity,
+              newRemainingQuantiy: data.newRemainingQuantity,
+            });
+            break;
+          }
+
+          case EventType.ORDER_CANCELLED: {
+            this.logger.info(
+              `Processing order cancelled event for user: ${unmarshedEvent.userId} of symbol ${unmarshedEvent.symbol}`,
+            );
+
+            const data = OrderStatusEvent.decode(unmarshedEvent.data);
+
+            // update maker and taker order detail
+            await this.orderController.updateOrderForCancelled({
+              id: data.orderId,
+              cancelledQuantity: data.cancelledQuantity,
+              remainingQuantiy: data.remainingQuantity,
+            });
+            break;
+          }
+
+          // TODO: complete this
+          case EventType.ORDER_REJECTED: {
+            this.logger.info(
+              `Processing order rejected event for user: ${unmarshedEvent.userId} of symbol ${unmarshedEvent.symbol}`,
+            );
+
+            const data = OrderStatusEvent.decode(unmarshedEvent.data);
+
+            // update maker and taker order detail
+            await this.orderController.updateOrderForCancelled({
+              id: data.orderId,
+              cancelledQuantity: data.cancelledQuantity,
+              remainingQuantiy: data.remainingQuantity,
+            });
             break;
           }
           default:
