@@ -643,7 +643,7 @@ func (me *MatchingEngine) ModifyOrderInternal(
 		return nil, nil, fmt.Errorf("order not modifiable")
 	}
 
-	executed := order.Quantity - order.RemainingQuantity
+	executed := order.FilledQuantity
 
 	if newQuantity != nil && *newQuantity < executed {
 		return nil, nil, fmt.Errorf("new quantity < executed quantity")
@@ -700,7 +700,7 @@ func (me *MatchingEngine) reduceOrder(
 	oldQuantity := order.Quantity
 	oldRemaining := order.RemainingQuantity
 
-	executed := oldQuantity - oldRemaining
+	executed := order.FilledQuantity
 	newRemaining := *newQuantity - executed
 
 	if newRemaining < 0 {
