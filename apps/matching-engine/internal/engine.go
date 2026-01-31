@@ -249,17 +249,17 @@ func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalRespo
 		return nil, nil, fmt.Errorf("Duplicate Order ID: %s", order.ClientOrderID)
 	}
 
-	trades := me.MatchOrder(order)
+	trades, filledRestingOrders := me.MatchOrder(order)
 
 	if order.Type == pbTypes.OrderType_MARKET {
 		// MARKET + no liquidity → already REJECTED inside MatchOrder
 		if order.Status == pbTypes.OrderStatus_REJECTED {
-			events := me.buildEvents(order, trades)
+			events := me.buildEvents(order, trades, filledRestingOrders)
 			return &AddOrderInternalResponse{Order: order, Trades: trades}, events, nil
 		}
 
 		// MARKET + partial fill → cancel remainder
-		if order.RemainingQuantity > 0 {
+		if order.RemainingQuantity > 0 && order.FilledQuantity > 0 {
 			order.Status = pbTypes.OrderStatus_CANCELLED
 
 			order.StatusMessage = "Market order partially filled; remaining quantity cancelled"
@@ -283,11 +283,12 @@ func (me *MatchingEngine) AddOrderInternal(order *Order) (*AddOrderInternalRespo
 		me.AllOrders[order.ClientOrderID] = order
 	}
 
-	events := me.buildEvents(order, trades)
+	events := me.buildEvents(order, trades, filledRestingOrders)
 	return &AddOrderInternalResponse{Order: order, Trades: trades}, events, nil
 }
 
-func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
+func (me *MatchingEngine) MatchOrder(incoming *Order) ([]Trade, []*Order) {
+	filledRestingOrders := []*Order{}
 	var oppositeBook *OrderBookSide
 
 	if incoming.Side == pbTypes.Side_BUY {
@@ -300,7 +301,7 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 	if incoming.Type == pbTypes.OrderType_MARKET && oppositeBook.IsEmpty() {
 		incoming.Status = pbTypes.OrderStatus_REJECTED
 		incoming.StatusMessage = "Market order rejected: no liquidity on opposite side"
-		return nil
+		return nil, nil
 	}
 
 	if incoming.Type == pbTypes.OrderType_LIMIT && incoming.RemainingQuantity == incoming.Quantity {
@@ -342,6 +343,8 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 
 		if restingOrder.RemainingQuantity == 0 {
 			restingOrder.Status = pbTypes.OrderStatus_FILLED
+			filledRestingOrders = append(filledRestingOrders, restingOrder)
+
 			bestPriceLevel.Remove(restingOrder)
 
 			delete(me.AllOrders, restingOrder.ClientOrderID)
@@ -358,7 +361,7 @@ func (me *MatchingEngine) MatchOrder(incoming *Order) []Trade {
 	} else {
 		incoming.Status = pbTypes.OrderStatus_PARTIAL_FILLED
 	}
-	return trades
+	return trades, filledRestingOrders
 }
 
 func (me *MatchingEngine) CanMatch(oppositeBook *OrderBookSide, incoming *Order) bool {
@@ -443,6 +446,7 @@ func (me *MatchingEngine) GenerateTradeID(seq uint64) string {
 func (me *MatchingEngine) buildEvents(
 	order *Order,
 	trades []Trade,
+	filledRestingOrders []*Order,
 ) []*pb.EngineEvent {
 
 	events := []*pb.EngineEvent{}
@@ -494,6 +498,16 @@ func (me *MatchingEngine) buildEvents(
 				events = append(events, tikcer)
 			}
 		}
+	}
+
+	for _, o := range filledRestingOrders {
+		data, _ := EncodeOrderStatusEvent(o, StrPtr(""), false)
+
+		events = append(events, &pb.EngineEvent{
+			EventType: pbTypes.EventType_ORDER_FILLED,
+			UserId:    o.UserID,
+			Data:      data,
+		})
 	}
 
 	// ---------- FINAL STATE ----------
@@ -1120,6 +1134,8 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 				return err
 			}
 
+			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "orderid", event.OrderId)
+
 			order := &Order{
 				Symbol:        event.Symbol,
 				Status:        event.Status,
@@ -1173,6 +1189,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 				restingOrder = buyOrder
 				order = sellOrder
 			}
+			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "buyerorder", buyOrder, "sellerorder", sellOrder, "tradeQuantity", event.Quantity)
 
 			restingOrder.RemainingQuantity -= event.Quantity
 			order.RemainingQuantity -= event.Quantity
@@ -1236,6 +1253,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			if err := proto.Unmarshal(logData.GetData(), &event); err != nil {
 				return err
 			}
+			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "orderid", event.OrderId)
 
 			order := a.engine.AllOrders[event.OrderId]
 			level := order.PriceLevel
@@ -1263,6 +1281,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			if err := proto.Unmarshal(logData.GetData(), &event); err != nil {
 				return err
 			}
+			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "orderid", event.Order.OrderId)
 
 			order := a.engine.AllOrders[event.Order.OrderId]
 			level := order.PriceLevel
@@ -1294,6 +1313,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			if err := proto.Unmarshal(logData.GetData(), &event); err != nil {
 				return err
 			}
+			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "orderid", event.OrderId)
 
 			order, exists := a.engine.AllOrders[event.OrderId]
 			if !exists {
@@ -1320,6 +1340,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			if err := proto.Unmarshal(logData.GetData(), &event); err != nil {
 				return err
 			}
+			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "orderid", event.OrderId)
 
 			order, exists := a.engine.AllOrders[event.OrderId]
 			if !exists {

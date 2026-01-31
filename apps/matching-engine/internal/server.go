@@ -30,12 +30,14 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 		EngineTimestamp:   timestamppb.New(time.Now()),
 	}
 
+	slog.Info("Request to place a order", "order", order)
+
 	res, err := PlaceOrder(order)
 
 	if err != nil {
 		slog.Error("Failed to process order",
-			"Error", err,
-			"orderId", req.ClientOrderId,
+			"order", order,
+			"error", err,
 		)
 		return nil, err
 	}
@@ -62,11 +64,11 @@ func (s *Server) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb
 }
 
 func (s *Server) CancelOrder(ctx context.Context, req *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {
-
+	slog.Info("Request for cancel a order", "orderId", req.Id, "symbol", req.Symbol)
 	res, err := CancelOrder(req.Id, req.UserId, req.Symbol)
 
 	if err != nil {
-		slog.Error("Failed to cancel order")
+		slog.Error("Failed to cancel order", "orderId", req.Id, "symbol", req.Symbol, "error", err)
 		return nil, err
 	}
 
@@ -78,11 +80,27 @@ func (s *Server) CancelOrder(ctx context.Context, req *pb.CancelOrderRequest) (*
 }
 
 func (s *Server) ModifyOrder(ctx context.Context, req *pb.ModifyOrderRequest) (*pb.ModifyOrderResponse, error) {
+	slog.Info("Request to modify a order",
+		"orderId", req.OrderId,
+		"symbol", req.Symbol,
+		"userId", req.UserId,
+		"ClientModifyId", req.ClientModifyId,
+		"NewPrice", req.NewPrice,
+		"NewQuantity", req.NewQuantity,
+	)
 
 	res, err := ModifyOrder(req.Symbol, req.OrderId, req.UserId, req.ClientModifyId, req.NewPrice, req.NewQuantity)
 
 	if err != nil {
-		slog.Error("Failed to modify order")
+		slog.Error("Failed to modify order",
+			"orderId", req.OrderId,
+			"symbol", req.Symbol,
+			"userId", req.UserId,
+			"ClientModifyId", req.ClientModifyId,
+			"NewPrice", req.NewPrice,
+			"NewQuantity", req.NewQuantity,
+			"error", err,
+		)
 		return nil, err
 	}
 
