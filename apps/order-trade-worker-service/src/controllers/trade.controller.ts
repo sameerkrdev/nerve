@@ -27,7 +27,7 @@ export class TradeServerController {
       }
 
       const newTrade = await this.tradeRepo.create({
-        id: data.id,
+        engine_id: data.id,
         symbol: data.symbol,
         price: data.price,
         quantity: data.quantity,

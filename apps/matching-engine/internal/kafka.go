@@ -124,7 +124,7 @@ func (kpw *KafkaProducerWorker) emitToKafka(events []*common.WAL_Entry) error {
 
 	for _, event := range events {
 		msg := &sarama.ProducerMessage{
-			Topic: "order-events",
+			Topic: "engine-events",
 			Key:   sarama.StringEncoder(kpw.Symbol),
 			Value: sarama.ByteEncoder(event.GetData()),
 			Headers: []sarama.RecordHeader{

@@ -1,5 +1,6 @@
 model Trade {
-    id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    engine_id String
 
     // Trade details
     symbol         String

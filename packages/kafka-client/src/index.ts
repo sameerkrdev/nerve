@@ -61,6 +61,9 @@ class KafkaClient {
     groupId: string,
     topic: string,
     handler: (message: T, topic: string, partition: number, headers: X) => Promise<void>,
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     schema?: z.ZodTypeAny,
   ) {
     const consumer = await this.createConsumer(groupId);
@@ -72,18 +75,19 @@ class KafkaClient {
       autoCommit: false,
       eachMessage: async ({ message, partition, topic }) => {
         try {
-          const raw = message.value?.toString();
+          const raw = message.value;
           if (!raw) return;
 
-          const parsed = JSON.parse(raw);
-          const payload = schema ? schema.parse(parsed) : parsed;
+          // const parsed = JSON.parse(raw.toString());
+          // const payload = schema ? schema.parse(parsed) : parsed;
 
           const headers: Record<string, string> = {};
           for (const [k, v] of Object.entries(message.headers || {})) {
             headers[k] = v ? v?.toString("utf-8") : "";
           }
 
-          await handler(payload, topic, partition, headers as X);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await handler(raw as any, topic, partition, headers as X);
 
           await consumer.commitOffsets([
             {

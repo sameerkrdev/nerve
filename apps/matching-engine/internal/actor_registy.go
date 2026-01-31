@@ -30,7 +30,14 @@ func StartActors(symbols []Symbol) {
 
 		// 1. Load snapshot (if exists)
 		// 2. Replay WAL (blocking)
-		actor.ReplyWal(0)
+		slog.Info(fmt.Sprintf("Replying the %s orderbook Starting...", sym.Name))
+		err = actor.ReplyWal(0)
+
+		if err != nil {
+			slog.Info(fmt.Sprintf("Replying the %s orderbook Failed. Error: %s", sym.Name, err.Error()))
+			continue
+		}
+		slog.Info(fmt.Sprintf("Replying the %s orderbook Completed and the order count is %v", sym.Name, len(actor.engine.AllOrders)))
 
 		// 3. Start other workers owned by actor
 		go actor.wal.keepSyncing()

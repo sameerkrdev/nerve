@@ -9,14 +9,15 @@ func StrPtr(s string) *string {
 	return &s
 }
 
-func EncodeOrderStatusEvent(order *Order, statusMessage *string) ([]byte, error) {
-	eventByte, err := proto.Marshal(&pb.OrderStatusEvent{
-		OrderId: order.ClientOrderID,
-		UserId:  order.UserID,
-		Symbol:  order.Symbol,
-		Status:  order.Status,
-		Side:    order.Side,
-		Type:    order.Type,
+func EncodeOrderStatusEvent(order *Order, statusMessage *string, isAcceptEvent bool) ([]byte, error) {
+	data := &pb.OrderStatusEvent{
+		OrderId:       order.ClientOrderID,
+		UserId:        order.UserID,
+		Symbol:        order.Symbol,
+		Status:        order.Status,
+		StatusMessage: statusMessage,
+		Side:          order.Side,
+		Type:          order.Type,
 
 		Price:         order.Price,
 		ExecutedValue: order.ExecutedValue,
@@ -30,7 +31,21 @@ func EncodeOrderStatusEvent(order *Order, statusMessage *string) ([]byte, error)
 		GatewayTimestamp: order.GatewayTimestamp,
 		ClientTimestamp:  order.ClientTimestamp,
 		EngineTimestamp:  order.EngineTimestamp,
-	})
+	}
+
+	if data.StatusMessage == nil || *data.StatusMessage == "" {
+		data.StatusMessage = &order.StatusMessage
+	}
+
+	if isAcceptEvent {
+		data.FilledQuantity = 0
+		data.CancelledQuantity = 0
+		data.RemainingQuantity = order.Quantity
+		data.ExecutedValue = 0
+		data.AveragePrice = 0
+	}
+
+	eventByte, err := proto.Marshal(data)
 	if err != nil {
 		return nil, err
 	}

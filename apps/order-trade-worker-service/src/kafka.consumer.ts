@@ -19,9 +19,9 @@ import {
 } from "@repo/proto-defs/ts/engine/order_matching";
 import {
   EventType,
-  orderStatusFromJSON,
-  orderTypeFromJSON,
-  sideFromJSON,
+  orderStatusToJSON,
+  orderTypeToJSON,
+  sideToJSON,
 } from "@repo/proto-defs/ts/common/order_types";
 import { TradeServerController } from "./controllers/trade.controller";
 
@@ -47,7 +47,7 @@ class KafkaConsumer {
   async startConsuming(): Promise<void> {
     this.kafkaClient.subscribe<Buffer, { sequence: string }>(
       KAFKA_CONSUMER_GROUP_ID.ORDER_CONSUMER_SERVICE_1,
-      KAFKA_TOPICS.ORDERS,
+      KAFKA_TOPICS.ENGINE_ENVENTS,
       async (event, topic, partition, headers) => {
         this.logger.info("Consumed message from 'orders' topic:", { topic, partition });
 
@@ -80,9 +80,9 @@ class KafkaConsumer {
               gatewayTimestamp: data.gatewayTimestamp!,
               clientTimestamp: data.clientTimestamp!,
               engineTimestamp: data.engineTimestamp!,
-              side: sideFromJSON(data.side) as unknown as OrderSide,
-              type: orderTypeFromJSON(data.type) as unknown as OrderType,
-              status: orderStatusFromJSON(data.status) as unknown as OrderStatus,
+              side: sideToJSON(data.side) as unknown as OrderSide,
+              type: orderTypeToJSON(data.type) as unknown as OrderType,
+              status: orderStatusToJSON(data.status) as unknown as OrderStatus,
             });
 
             break;
@@ -164,7 +164,6 @@ class KafkaConsumer {
             break;
           }
 
-          // TODO: complete this
           case EventType.ORDER_REJECTED: {
             this.logger.info(
               `Processing order rejected event for user: ${unmarshedEvent.userId} of symbol ${unmarshedEvent.symbol}`,
@@ -172,11 +171,24 @@ class KafkaConsumer {
 
             const data = OrderStatusEvent.decode(unmarshedEvent.data);
 
-            // update maker and taker order detail
-            await this.orderController.updateOrderForCancelled({
+            await this.orderController.createOrder({
               id: data.orderId,
+              symbol: data.symbol,
+              statusMessage: data.statusMessage,
+              filledQuantity: data.filledQuantity,
               cancelledQuantity: data.cancelledQuantity,
-              remainingQuantiy: data.remainingQuantity,
+              quantity: data.quantity,
+              averagePrice: data.averagePrice,
+              userId: data.userId,
+              price: data.price,
+              remainingQuantity: data.remainingQuantity,
+              executedValue: data.executedValue,
+              gatewayTimestamp: data.gatewayTimestamp!,
+              clientTimestamp: data.clientTimestamp!,
+              engineTimestamp: data.engineTimestamp!,
+              side: sideToJSON(data.side) as unknown as OrderSide,
+              type: orderTypeToJSON(data.type) as unknown as OrderType,
+              status: orderStatusToJSON(data.status) as unknown as OrderStatus,
             });
             break;
           }

@@ -42,6 +42,8 @@ export class OrderServerController {
         side: order.side,
         type: order.type,
         userId: order.userId,
+        clientTimestamp: order.clientTimestamp,
+        gatewayTimestamp: order.gatewayTimestamp,
       };
 
       const response = await new Promise<PlaceOrderResponse>((resolve, reject) => {
