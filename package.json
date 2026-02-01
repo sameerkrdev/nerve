@@ -37,10 +37,10 @@
     "infra:clickhouse:reset": "docker compose --env-file .env -f infra/docker/clickhouse/docker-compose.yml down -v && docker compose --env-file .env -f infra/docker/clickhouse/docker-compose.yml up -d",
     "infra:clickhouse:restart": "docker compose --env-file .env -f infra/docker/clickhouse/docker-compose.yml restart",
     "infra:clickhouse:ps": "docker compose --env-file .env -f infra/docker/clickhouse/docker-compose.yml ps",
-    "kafka:topics:list": "docker exec $(docker ps -qf name=kafka) kafka-topics --bootstrap-server localhost:9092 --list",
-    "kafka:topics:create": "docker exec $(docker ps -qf name=kafka) kafka-topics --bootstrap-server localhost:9092 --create --topic",
-    "kafka:consumer": "docker exec -it $(docker ps -qf name=kafka) kafka-console-consumer --bootstrap-server localhost:9092 --topic",
-    "kafka:producer": "docker exec -it $(docker ps -qf name=kafka) kafka-console-producer --bootstrap-server localhost:9092 --topic"
+    "kafka:topics:list": "docker exec $(docker ps -qf name=kafka-1) kafka-topics --bootstrap-server localhost:9092 --list",
+    "kafka:topics:create": "docker exec $(docker ps -qf name=kafka-1) kafka-topics --bootstrap-server localhost:9092 --create --topic",
+    "kafka:consumer": "docker exec -it $(docker ps -qf name=kafka-1) kafka-console-consumer --bootstrap-server localhost:9092 --topic",
+    "kafka:producer": "docker exec -it $(docker ps -qf name=kafka-1) kafka-console-producer --bootstrap-server localhost:9092 --topic"
   },
   "devDependencies": {
     "husky": "^8.0.0",

@@ -30,7 +30,14 @@ func StartActors(symbols []Symbol) {
 
 		// 1. Load snapshot (if exists)
 		// 2. Replay WAL (blocking)
-		actor.ReplyWal(0)
+		slog.Info(fmt.Sprintf("replaying the %s orderbook Starting...", sym.Name))
+		err = actor.replayWal(0)
+
+		if err != nil {
+			slog.Info(fmt.Sprintf("Replaying the %s orderbook Failed. Error: %s", sym.Name, err.Error()))
+			continue
+		}
+		slog.Info(fmt.Sprintf("Replaying the %s orderbook Completed and the order count is %v", sym.Name, len(actor.engine.AllOrders)))
 
 		// 3. Start other workers owned by actor
 		go actor.wal.keepSyncing()
@@ -50,16 +57,16 @@ func PlaceOrder(order *Order) (*AddOrderInternalResponse, error) {
 		return nil, fmt.Errorf("unknown symbol %s", order.Symbol)
 	}
 
-	replyCh := make(chan *AddOrderInternalResponse, 1)
+	replayCh := make(chan *AddOrderInternalResponse, 1)
 	errCh := make(chan error, 1)
 	actor.inbox <- PlaceOrderMsg{
-		Order: order,
-		Reply: replyCh,
-		Err:   errCh,
+		Order:  order,
+		replay: replayCh,
+		Err:    errCh,
 	}
 
 	select {
-	case res := <-replyCh:
+	case res := <-replayCh:
 		return res, nil
 	case err := <-errCh:
 		return nil, fmt.Errorf("failed to process the order. Error: %v", err)
@@ -72,19 +79,19 @@ func CancelOrder(id string, userID string, symbol string) (*CancelOrderInternalR
 		return nil, fmt.Errorf("unknown symbol %s", symbol)
 	}
 
-	replyCh := make(chan *CancelOrderInternalResponse, 1)
+	replayCh := make(chan *CancelOrderInternalResponse, 1)
 	errCh := make(chan error, 1)
 
 	actor.inbox <- CancelOrderMsg{
 		ID:     id,
 		UserID: userID,
 		Symbol: symbol,
-		Reply:  replyCh,
+		replay: replayCh,
 		Err:    errCh,
 	}
 
 	select {
-	case res := <-replyCh:
+	case res := <-replayCh:
 		return res, nil
 	case err := <-errCh:
 		return nil, err
@@ -104,7 +111,7 @@ func ModifyOrder(
 		return nil, fmt.Errorf("unknown symbol %s", symbol)
 	}
 
-	replyCh := make(chan *ModifyOrderInternalResponse, 1)
+	replayCh := make(chan *ModifyOrderInternalResponse, 1)
 	errCh := make(chan error, 1)
 
 	actor.inbox <- ModifyOrderMsg{
@@ -114,12 +121,12 @@ func ModifyOrder(
 		ClientModifyID: clientModifyID,
 		NewPrice:       newPrice,
 		NewQuantity:    newQuantity,
-		Reply:          replyCh,
+		replay:         replayCh,
 		Err:            errCh,
 	}
 
 	select {
-	case res := <-replyCh:
+	case res := <-replayCh:
 		return res, nil
 	case err := <-errCh:
 		return nil, err

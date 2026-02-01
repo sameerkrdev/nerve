@@ -23,6 +23,8 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  apps/aggeration-service: {}
+
   apps/api-gateway:
     dependencies:
       "@grpc/grpc-js":
@@ -43,6 +45,9 @@ importers:
       "@repo/proto-defs":
         specifier: workspace:*
         version: link:../../packages/proto-defs
+      "@repo/utils":
+        specifier: workspace:*
+        version: link:../../packages/utils
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
@@ -139,80 +144,6 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  apps/ledger-service:
-    dependencies:
-      "@repo/logger":
-        specifier: workspace:*
-        version: link:../../packages/logger
-      dotenv:
-        specifier: ^17.2.2
-        version: 17.2.2
-      envalid:
-        specifier: ^8.1.0
-        version: 8.1.0
-    devDependencies:
-      "@repo/eslint-config":
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      "@repo/types":
-        specifier: workspace:*
-        version: link:../../packages/types
-      "@repo/typescript-config":
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      "@types/node":
-        specifier: ^22.15.3
-        version: 22.15.3
-      nodemon:
-        specifier: ^3.1.10
-        version: 3.1.10
-      ts-node:
-        specifier: ^10.9.2
-        version: 10.9.2(@swc/core@1.13.5(@swc/helpers@0.5.15))(@types/node@22.15.3)(typescript@5.9.3)
-      tsconfig-paths:
-        specifier: ^4.2.0
-        version: 4.2.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  apps/market-data-service:
-    dependencies:
-      "@repo/logger":
-        specifier: workspace:*
-        version: link:../../packages/logger
-      dotenv:
-        specifier: ^17.2.2
-        version: 17.2.2
-      envalid:
-        specifier: ^8.1.0
-        version: 8.1.0
-    devDependencies:
-      "@repo/eslint-config":
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      "@repo/types":
-        specifier: workspace:*
-        version: link:../../packages/types
-      "@repo/typescript-config":
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      "@types/node":
-        specifier: ^22.15.3
-        version: 22.15.3
-      nodemon:
-        specifier: ^3.1.10
-        version: 3.1.10
-      ts-node:
-        specifier: ^10.9.2
-        version: 10.9.2(@swc/core@1.13.5(@swc/helpers@0.5.15))(@types/node@22.15.3)(typescript@5.9.3)
-      tsconfig-paths:
-        specifier: ^4.2.0
-        version: 4.2.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
   apps/market-maker:
     dependencies:
       "@repo/logger":
@@ -251,43 +182,6 @@ importers:
         version: 5.9.3
 
   apps/matching-engine: {}
-
-  apps/notification-service:
-    dependencies:
-      "@repo/logger":
-        specifier: workspace:*
-        version: link:../../packages/logger
-      dotenv:
-        specifier: ^17.2.2
-        version: 17.2.2
-      envalid:
-        specifier: ^8.1.0
-        version: 8.1.0
-    devDependencies:
-      "@repo/eslint-config":
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      "@repo/types":
-        specifier: workspace:*
-        version: link:../../packages/types
-      "@repo/typescript-config":
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      "@types/node":
-        specifier: ^22.15.3
-        version: 22.15.3
-      nodemon:
-        specifier: ^3.1.10
-        version: 3.1.10
-      ts-node:
-        specifier: ^10.9.2
-        version: 10.9.2(@swc/core@1.13.5(@swc/helpers@0.5.15))(@types/node@22.15.3)(typescript@5.9.3)
-      tsconfig-paths:
-        specifier: ^4.2.0
-        version: 4.2.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
 
   apps/order-service:
     dependencies:
@@ -341,7 +235,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  apps/order-worker-service:
+  apps/order-trade-worker-service:
     dependencies:
       "@repo/kafka-client":
         specifier: workspace:*
@@ -441,6 +335,8 @@ importers:
       vite-tsconfig-paths:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.8.3)(vite@7.1.5(@types/node@22.15.3)(jiti@2.6.1)(yaml@2.8.1))
+
+  apps/websocket-server: {}
 
   packages/clickhouse:
     dependencies:
@@ -646,6 +542,28 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
+
+  packages/utils:
+    dependencies:
+      "@repo/proto-defs":
+        specifier: workspace:*
+        version: link:../proto-defs
+    devDependencies:
+      "@repo/eslint-config":
+        specifier: workspace:*
+        version: link:../eslint-config
+      "@repo/types":
+        specifier: workspace:*
+        version: link:../types
+      "@repo/typescript-config":
+        specifier: workspace:*
+        version: link:../typescript-config
+      "@types/node":
+        specifier: ^22.15.3
+        version: 22.15.3
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
 
   packages/validator:
     dependencies:

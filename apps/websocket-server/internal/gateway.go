@@ -89,10 +89,8 @@ func (wsg *WSGateway) subscribeToSymbol(symbol string) error {
 		Timestamp: time.Now().UnixNano(),
 	}
 	stream, err := client.SubscribeSymbol(context.Background(), req)
-	fmt.Println("stream", stream)
 
 	if err != nil {
-		fmt.Println("stream1", err)
 		return err
 	}
 

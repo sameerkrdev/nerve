@@ -328,7 +328,7 @@ func (sw *SymbolWAL) ReadFromTo(from, to uint64) ([]*pbTypes.WAL_Entry, error) {
 	results := make([]*pbTypes.WAL_Entry, 0, to-from+1)
 
 	for _, dirEntry := range entries {
-		if dirEntry.IsDir() {
+		if dirEntry.IsDir() || !strings.Contains(dirEntry.Name(), ".log") {
 			continue
 		}
 
@@ -347,7 +347,6 @@ func (sw *SymbolWAL) ReadFromTo(from, to uint64) ([]*pbTypes.WAL_Entry, error) {
 				}
 				return nil, err
 			}
-
 			if size == 0 {
 				return nil, fmt.Errorf("invalid WAL record size")
 			}
@@ -392,7 +391,7 @@ func (sw *SymbolWAL) ReadFromToLast(from uint64) ([]*pbTypes.WAL_Entry, error) {
 	results := make([]*pbTypes.WAL_Entry, 0, 1_000_000)
 
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || !strings.Contains(entry.Name(), ".log") {
 			continue
 		}
 
@@ -447,8 +446,10 @@ func unmarshalAndVerifyEntry(data []byte) (*pbTypes.WAL_Entry, error) {
 		panic(fmt.Sprintf("unmarshal should never fail (%v)", err))
 	}
 
-	actualChecksum := crc32.ChecksumIEEE(append(entry.GetData(), byte(entry.GetSequenceNumber())))
+	var seqBytes [8]byte
+	binary.LittleEndian.PutUint64(seqBytes[:], entry.GetSequenceNumber())
 
+	actualChecksum := crc32.ChecksumIEEE(append(entry.GetData(), seqBytes[:]...))
 	if actualChecksum != entry.GetCRC() {
 		return nil, fmt.Errorf("CRC mismatch: data may be corrupted")
 	}

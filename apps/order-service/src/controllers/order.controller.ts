@@ -42,6 +42,8 @@ export class OrderServerController {
         side: order.side,
         type: order.type,
         userId: order.userId,
+        clientTimestamp: order.clientTimestamp,
+        gatewayTimestamp: order.gatewayTimestamp,
       };
 
       const response = await new Promise<PlaceOrderResponse>((resolve, reject) => {
@@ -77,7 +79,7 @@ export class OrderServerController {
       callback(
         {
           code: grpc.status.INTERNAL,
-          message: "Failed to place order",
+          message: err.message,
           name: "CreateOrderError",
         } as grpc.ServiceError,
         null,
@@ -126,7 +128,7 @@ export class OrderServerController {
       callback(
         {
           code: grpc.status.INTERNAL,
-          message: "Failed to cancel order",
+          message: err.message,
           name: "CancelOrderError",
         } as grpc.ServiceError,
         null,
@@ -182,7 +184,7 @@ export class OrderServerController {
       callback(
         {
           code: grpc.status.INTERNAL,
-          message: "Failed to modify order",
+          message: err.message,
           name: "ModifyOrderError",
         } as grpc.ServiceError,
         null,

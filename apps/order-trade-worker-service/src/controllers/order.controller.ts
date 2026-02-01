@@ -55,7 +55,7 @@ export class OrderServerController {
         quantity: data.quantity,
         remaining_quantity: data.remainingQuantity,
         filled_quantity: data.filledQuantity,
-        canelled_quantity: data.cancelledQuantity,
+        canelled_quantity: data.cancelledQuantity, // TODO: fix this typo
 
         gateway_timeline: data.gatewayTimestamp,
         client_timeline: data.clientTimestamp,
