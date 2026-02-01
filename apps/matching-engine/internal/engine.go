@@ -845,16 +845,16 @@ func (me *MatchingEngine) replaceOrder(
 type EngineMsg interface{}
 
 type PlaceOrderMsg struct {
-	Order *Order
-	Reply chan *AddOrderInternalResponse
-	Err   chan error
+	Order  *Order
+	replay chan *AddOrderInternalResponse
+	Err    chan error
 }
 
 type CancelOrderMsg struct {
 	ID     string
 	UserID string
 	Symbol string
-	Reply  chan *CancelOrderInternalResponse
+	replay chan *CancelOrderInternalResponse
 	Err    chan error
 }
 
@@ -865,7 +865,7 @@ type ModifyOrderMsg struct {
 	Symbol         string
 	NewPrice       *int64
 	NewQuantity    *int64
-	Reply          chan *ModifyOrderInternalResponse
+	replay         chan *ModifyOrderInternalResponse
 	Err            chan error
 }
 
@@ -955,7 +955,7 @@ func (a *SymbolActor) Run() {
 				}
 			}
 
-			m.Reply <- response
+			m.replay <- response
 
 		case CancelOrderMsg:
 			response, events, err := a.engine.CancelOrderInternal(m.ID, m.UserID, m.Symbol)
@@ -990,7 +990,7 @@ func (a *SymbolActor) Run() {
 				}
 			}
 
-			m.Reply <- response
+			m.replay <- response
 
 		case ModifyOrderMsg:
 			response, events, err := a.engine.ModifyOrderInternal(m.Symbol, m.OrderID, m.UserID, m.ClientModifyID, m.NewPrice, m.NewQuantity)
@@ -1026,7 +1026,7 @@ func (a *SymbolActor) Run() {
 
 			}
 
-			m.Reply <- response
+			m.replay <- response
 
 		default:
 			panic("unknown actor message")
@@ -1114,7 +1114,7 @@ func (me *MatchingEngine) getTickerEvent(lastPrice int64, bidPrice int64, askPri
 	return event, nil
 }
 
-func (a *SymbolActor) ReplyWal(from uint64) error {
+func (a *SymbolActor) replayWal(from uint64) error {
 	logs, err := a.wal.ReadFromToLast(from)
 	if err != nil {
 		return err
@@ -1293,7 +1293,7 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 
 			volumeDelta := event.OldRemainingQuantity - event.NewRemainingQuantity
 			order.PriceLevel.TotalVolume -= uint64(volumeDelta)
-			fmt.Println("At the end of reduced reply function", "SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "order", order)
+			fmt.Println("At the end of reduced replay function", "SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "order", order)
 
 			// if order.RemainingQuantity == 0 {
 			// 	level.Remove(order)
