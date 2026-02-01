@@ -579,7 +579,7 @@ func (me *MatchingEngine) CancelOrderInternal(
 	}
 
 	// cancel remaining quantity
-	order.CancelledQuantity = order.RemainingQuantity
+	order.CancelledQuantity += order.RemainingQuantity
 	order.RemainingQuantity = 0
 	order.Status = pbTypes.OrderStatus_CANCELLED
 
@@ -643,7 +643,8 @@ func (me *MatchingEngine) ModifyOrderInternal(
 		return nil, nil, fmt.Errorf("order not modifiable")
 	}
 
-	executed := order.FilledQuantity
+	// Here we used Qty - remainingQty instead of filledQty because filledQty doen't inculde cancelledQty but Qty - remainingQty does
+	executed := order.Quantity - order.RemainingQuantity // order.FilledQuantity + order.CancelledQuantity
 
 	if newQuantity != nil && *newQuantity < executed {
 		return nil, nil, fmt.Errorf("new quantity < executed quantity")
@@ -699,8 +700,9 @@ func (me *MatchingEngine) reduceOrder(
 
 	oldQuantity := order.Quantity
 	oldRemaining := order.RemainingQuantity
+	oldCancelledQuantity := order.CancelledQuantity
 
-	executed := order.FilledQuantity
+	executed := order.Quantity - order.RemainingQuantity
 	newRemaining := *newQuantity - executed
 
 	if newRemaining < 0 {
@@ -708,14 +710,9 @@ func (me *MatchingEngine) reduceOrder(
 	}
 	volumeDelta := oldRemaining - newRemaining
 
-	oldCancelledQuantity := order.CancelledQuantity
-	newCancelledQuantity := order.CancelledQuantity + volumeDelta
+	newCancelledQuantity := oldCancelledQuantity + volumeDelta
 
-	// apply mutation
-	// order.Quantity = *newQuantity
 	order.RemainingQuantity = newRemaining
-	order.CancelledQuantity += oldRemaining - newRemaining
-
 	order.CancelledQuantity = newCancelledQuantity
 
 	// update price level volume
@@ -759,7 +756,7 @@ func (me *MatchingEngine) reduceOrder(
 		}
 
 	} else {
-		event, err := EncodeOrderReducedEvent(order, oldQuantity, oldRemaining, newCancelledQuantity, oldCancelledQuantity)
+		event, err := EncodeOrderReducedEvent(order, oldQuantity, *newQuantity, oldRemaining, newRemaining, newCancelledQuantity, oldCancelledQuantity)
 		if err != nil {
 			return nil, err
 		}
@@ -789,7 +786,8 @@ func (me *MatchingEngine) replaceOrder(
 ) ([]*pb.EngineEvent, error) {
 
 	var events []*pb.EngineEvent
-	executed := order.Quantity - order.RemainingQuantity
+	oldRemainingQuantity := order.RemainingQuantity
+	oldFilledQuantity := order.FilledQuantity
 
 	// ---------- cancel old ----------
 	_, cancelEvents, err := me.CancelOrderInternal(
@@ -807,26 +805,29 @@ func (me *MatchingEngine) replaceOrder(
 		price = *newPrice
 	}
 
-	totalQty := order.Quantity
+	newOrderQuantity := oldRemainingQuantity
 	if newQuantity != nil {
-		totalQty = *newQuantity
+		newOrderQuantity = *newQuantity - oldFilledQuantity
 	}
 
-	newRemaining := totalQty - executed
+	if newOrderQuantity <= 0 {
+		return nil, fmt.Errorf("nothing remaining after accounting for executed quantity")
+	}
 
 	// ---------- create new ----------
 	newOrder := &Order{
 		Symbol:            order.Symbol,
 		Price:             price,
-		Quantity:          totalQty,
-		RemainingQuantity: newRemaining,
+		Quantity:          newOrderQuantity,
+		RemainingQuantity: newOrderQuantity,
 		Side:              order.Side,
 		Type:              order.Type,
 		ClientOrderID:     newOrderID,
 		UserID:            order.UserID,
 		EngineTimestamp:   timestamppb.New(time.Now()), // priority reset
+		GatewayTimestamp:  timestamppb.New(time.Now()),
+		ClientTimestamp:   timestamppb.New(time.Now()),
 	}
-
 	_, addEvents, err := me.AddOrderInternal(newOrder)
 	if err != nil {
 		return nil, err
@@ -1284,28 +1285,29 @@ func (a *SymbolActor) ReplyWal(from uint64) error {
 			fmt.Println("SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "orderid", event.Order.OrderId)
 
 			order := a.engine.AllOrders[event.Order.OrderId]
-			level := order.PriceLevel
+			// level := order.PriceLevel
 
 			// order.Quantity = event.NewQuantity
 			order.RemainingQuantity = event.NewRemainingQuantity
-			order.CancelledQuantity += event.NewCancelledQuantity
+			order.CancelledQuantity = event.NewCancelledQuantity
 
 			volumeDelta := event.OldRemainingQuantity - event.NewRemainingQuantity
 			order.PriceLevel.TotalVolume -= uint64(volumeDelta)
+			fmt.Println("At the end of reduced reply function", "SequenceNumber", log.SequenceNumber, "EventType", logData.EventType, "order", order)
 
-			if order.RemainingQuantity == 0 {
-				level.Remove(order)
-				delete(a.engine.AllOrders, order.ClientOrderID)
+			// if order.RemainingQuantity == 0 {
+			// 	level.Remove(order)
+			// 	delete(a.engine.AllOrders, order.ClientOrderID)
 
-				obs := a.engine.Asks
-				if order.Side == pbTypes.Side_BUY {
-					obs = a.engine.Bids
-				}
+			// 	obs := a.engine.Asks
+			// 	if order.Side == pbTypes.Side_BUY {
+			// 		obs = a.engine.Bids
+			// 	}
 
-				if level.IsEmpty() {
-					obs.RemovePriceLevel(level)
-				}
-			}
+			// 	if level.IsEmpty() {
+			// 		obs.RemovePriceLevel(level)
+			// 	}
+			// }
 
 		case pbTypes.EventType_ORDER_REJECTED:
 			var event pb.OrderStatusEvent
