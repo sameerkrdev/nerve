@@ -143,7 +143,10 @@ func (sw *SymbolWAL) writeEntry(data []byte) error {
 		return err
 	}
 
-	crc := crc32.ChecksumIEEE(append(data, byte(sw.nextOffset)))
+	var seqBytes [8]byte
+	binary.LittleEndian.PutUint64(seqBytes[:], sw.nextOffset)
+	crc := crc32.ChecksumIEEE(append(data, seqBytes[:]...))
+
 	entry := &pbTypes.WAL_Entry{
 		SequenceNumber: sw.nextOffset,
 		Data:           data,
@@ -186,7 +189,7 @@ func (sw *SymbolWAL) rotateFile() error {
 			return err
 		}
 
-		filePath := filepath.Join(sw.dirPath, fmt.Sprintf("%v", sw.currentSegmentIndex+1))
+		filePath := filepath.Join(sw.dirPath, fmt.Sprintf("%v.log", sw.currentSegmentIndex+1))
 
 		file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -377,10 +380,6 @@ func (sw *SymbolWAL) ReadFromTo(from, to uint64) ([]*pbTypes.WAL_Entry, error) {
 }
 
 func (sw *SymbolWAL) ReadFromToLast(from uint64) ([]*pbTypes.WAL_Entry, error) {
-	if from > 0 {
-		return nil, fmt.Errorf("invalid from")
-	}
-
 	entries, err := os.ReadDir(sw.dirPath)
 	if err != nil {
 		return nil, err

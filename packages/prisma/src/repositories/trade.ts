@@ -18,10 +18,10 @@ export class TradeRepository {
     return this.client.trade.findUnique({
       where: { id },
       include: {
-        maker_order: true,
-        taker_order: true,
-        maker_user: true,
-        taker_user: true,
+        buy_order: true,
+        sell_order: true,
+        seller: true,
+        buyer: true,
       },
     });
   }
@@ -32,7 +32,7 @@ export class TradeRepository {
   async findBySymbol(symbol: string, limit = 100): Promise<Trade[]> {
     return this.client.trade.findMany({
       where: { symbol },
-      orderBy: { executed_at: "desc" },
+      orderBy: { created_at: "desc" },
       take: limit,
     });
   }
@@ -43,25 +43,10 @@ export class TradeRepository {
   async findByUser(userId: string, limit = 100): Promise<Trade[]> {
     return this.client.trade.findMany({
       where: {
-        OR: [{ maker_user_id: userId }, { taker_user_id: userId }],
+        OR: [{ seller_id: userId }, { buyer_id: userId }],
       },
-      orderBy: { executed_at: "desc" },
+      orderBy: { created_at: "desc" },
       take: limit,
-    });
-  }
-
-  /**
-   * Fetch trades between two users (e.g., counterparty analysis)
-   */
-  async findBetweenUsers(userA: string, userB: string): Promise<Trade[]> {
-    return this.client.trade.findMany({
-      where: {
-        OR: [
-          { maker_user_id: userA, taker_user_id: userB },
-          { maker_user_id: userB, taker_user_id: userA },
-        ],
-      },
-      orderBy: { executed_at: "desc" },
     });
   }
 

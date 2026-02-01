@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package engine.matching;
 
-option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine/matching";
-
-import "google/protobuf/timestamp.proto";
 import "common/order_types.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine/matching";
 
 message PlaceOrderRequest {
   string symbol = 1;
@@ -35,9 +35,8 @@ message PlaceOrderResponse {
   google.protobuf.Timestamp client_timestamp = 13;
   google.protobuf.Timestamp gateway_timestamp = 14;
 
-
   common.order.OrderStatus status = 15;
-  optional  string status_message = 16;
+  optional string status_message = 16;
   string auction_number = 17;
   google.protobuf.Timestamp engine_timestamp = 18;
 }
@@ -78,17 +77,17 @@ message ModifyOrderResponse {
 }
 
 message SubscribeRequest {
-  string symbol = 1;      
-  string gateway_id = 2;   // Unique ws gateway identifier
-  int64 timestamp = 3;     // Subscription timestamp
+  string symbol = 1;
+  string gateway_id = 2; // Unique ws gateway identifier
+  int64 timestamp = 3; // Subscription timestamp
 }
 
 // Events pushed from engine to ws gateway via stream
 message EngineEvent {
-  common.order.EventType event_type = 1;   // "trade", "depth", "order_update", "ticker"
+  common.order.EventType event_type = 1; // "trade", "depth", "order_update", "ticker"
   string user_id = 2;
-  bytes data = 3;          
-  string symbol = 4;       // Symbol
+  bytes data = 3;
+  string symbol = 4; // Symbol
 }
 
 service MatchingEngine {
@@ -98,7 +97,6 @@ service MatchingEngine {
 
   rpc SubscribeSymbol(SubscribeRequest) returns (stream EngineEvent);
 }
-
 
 // ============= EVENT DATA STRUCTURES =============
 // These are encoded as JSON in SymbolEvent.data field
@@ -115,7 +113,7 @@ message TradeEvent {
   string buy_order_id = 8;
   string sell_order_id = 9;
   google.protobuf.Timestamp timestamp = 10;
-  bool is_buyer_maker = 11;  // True if buyer order was in book first
+  bool is_buyer_maker = 11; // True if buyer order was in book first
 }
 
 // Depth update event (sent when order book changes)
@@ -130,7 +128,7 @@ message DepthEvent {
 message PriceLevel {
   int64 price = 1;
   int64 quantity = 2;
-  int64 order_count = 3;  // Number of orders at this level
+  int64 order_count = 3; // Number of orders at this level
   int64 volume = 4;
 }
 
@@ -144,8 +142,8 @@ message OrderStatusEvent {
   common.order.OrderType type = 6;
   int64 quantity = 7;
   int64 executed_value = 8;
-  common.order.OrderStatus status = 9;  // "FILLED", "PARTIAL", "CANCELLED", "REJECTED"
-  optional  string status_message = 10;
+  common.order.OrderStatus status = 9; // "FILLED", "PARTIAL", "CANCELLED", "REJECTED"
+  optional string status_message = 10;
   int64 filled_quantity = 11;
   int64 remaining_quantity = 12;
   int64 cancelled_quantity = 13;
@@ -156,11 +154,13 @@ message OrderStatusEvent {
 }
 
 message OrderReducedEvent {
-  OrderStatusEvent Order = 1;
+  OrderStatusEvent order = 1;
   int64 old_quantity = 2;
   int64 new_quantity = 3;
   int64 old_remaining_quantity = 4;
   int64 new_remaining_quantity = 5;
+  int64 old_cancelled_quantity = 6;
+  int64 new_cancelled_quantity = 7;
 }
 
 // Ticker event (periodic price updates)
@@ -176,5 +176,3 @@ message TickerEvent {
   int64 price_change_percent_24h = 9;
   google.protobuf.Timestamp timestamp = 10;
 }
-
-
