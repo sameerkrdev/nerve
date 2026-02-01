@@ -47,7 +47,7 @@ class KafkaConsumer {
   async startConsuming(): Promise<void> {
     this.kafkaClient.subscribe<Buffer, { sequence: string }>(
       KAFKA_CONSUMER_GROUP_ID.ORDER_CONSUMER_SERVICE_1,
-      KAFKA_TOPICS.ENGINE_ENVENTS,
+      KAFKA_TOPICS.ENGINE_EVENTS,
       async (event, topic, partition, headers) => {
         this.logger.info("Consumed message from 'orders' topic:", { topic, partition });
 

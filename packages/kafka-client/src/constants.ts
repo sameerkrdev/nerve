@@ -1,5 +1,5 @@
 const KAFKA_TOPICS = {
-  ENGINE_ENVENTS: "engine-events",
+  ENGINE_EVENTS: "engine-events",
   TRADES: "trades",
   PAYMENTS: "payments",
   USERS: "users",
