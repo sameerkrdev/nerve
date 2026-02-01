@@ -1041,7 +1041,7 @@ func (me *MatchingEngine) getDepthEvent() (*pb.EngineEvent, error) {
 	asks := make([]*pb.PriceLevel, 0, depthLevel)
 
 	temp := me.Bids.BestPriceLevel
-	for i := 1; i < depthLevel; i++ {
+	for range depthLevel {
 		if temp == nil {
 			break
 		}
@@ -1057,7 +1057,7 @@ func (me *MatchingEngine) getDepthEvent() (*pb.EngineEvent, error) {
 	}
 
 	temp = me.Asks.BestPriceLevel
-	for i := 1; i < depthLevel; i++ {
+	for range depthLevel {
 		if temp == nil {
 			break
 		}
