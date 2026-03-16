@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package aggeration.v1;
+
+import "aggeration/v1/common.proto";
+
+option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/proto/aggeration/v1";
+
+message Candle {
+  double o = 1;
+  double h = 2;
+  double l = 3;
+  double c = 4;
+  int64 v = 5;
+
+  bool is_closed = 6;
+  optional int64 close_time = 7; // seconds
+  int64 open_time = 8; // seconds
+}
+
+message CandleBatch {
+  string symbol = 1;
+  Timeframe timeframe = 2;
+  repeated Candle candles = 3;
+}
+
+message GetCandlestickRequest {
+  string symbol = 1;
+  string currency = 2;
+  string timeframe = 3;
+  oneof method {
+    int64 number_of_candlesticks = 4;
+    DateRange date_range = 5;
+  }
+}
+
+message GetCandlestickResponse {
+  oneof result {
+    CandleBatch data = 1;
+    Error error = 2;
+  }
+}
+
+message CandleUpdate {
+  enum UpdateType {
+    UPDATE_TYPE_UNSPECIFIED = 0;
+    UPDATE_TYPE_NEW = 1; // New candle created
+    UPDATE_TYPE_UPDATE = 2; // Existing candle updated
+    UPDATE_TYPE_CLOSE = 3; // Candle closed (finalized)
+  }
+
+  UpdateType type = 1;
+  Candle candle = 2;
+
+  int64 timestamp = 3;
+}
+
+message SubscribeCandlesRequest {
+  string symbol = 1;
+  repeated Timeframe timeframes = 2;
+}
+
+message SubscriptionConfirmation {
+  string symbol = 1;
+  Timeframe timeframe = 2;
+  string subscription_id = 3;
+}
+
+message CandleStreamMessage {
+  oneof message {
+    CandleUpdate update = 1;
+    SubscriptionConfirmation confirmation = 2;
+    Error error = 3;
+  }
+}
+
+service CandleService {
+  rpc GetCandles(GetCandlestickRequest) returns (GetCandlestickResponse);
+
+  rpc SubscribeCandles(stream SubscribeCandlesRequest) returns (stream CandleStreamMessage);
+}
