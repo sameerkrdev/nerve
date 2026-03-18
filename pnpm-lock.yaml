@@ -23,8 +23,6 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
-  apps/aggeration-service: {}
-
   apps/api-gateway:
     dependencies:
       "@grpc/grpc-js":
@@ -45,9 +43,6 @@ importers:
       "@repo/proto-defs":
         specifier: workspace:*
         version: link:../../packages/proto-defs
-      "@repo/utils":
-        specifier: workspace:*
-        version: link:../../packages/utils
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
@@ -94,6 +89,8 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
+
+  apps/candle-service: {}
 
   apps/express-base-template:
     dependencies:
@@ -542,28 +539,6 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
-
-  packages/utils:
-    dependencies:
-      "@repo/proto-defs":
-        specifier: workspace:*
-        version: link:../proto-defs
-    devDependencies:
-      "@repo/eslint-config":
-        specifier: workspace:*
-        version: link:../eslint-config
-      "@repo/types":
-        specifier: workspace:*
-        version: link:../types
-      "@repo/typescript-config":
-        specifier: workspace:*
-        version: link:../typescript-config
-      "@types/node":
-        specifier: ^22.15.3
-        version: 22.15.3
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
 
   packages/validator:
     dependencies:

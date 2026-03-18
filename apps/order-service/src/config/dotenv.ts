@@ -11,8 +11,6 @@ export const env = cleanEnv(process.env, {
   MATCHING_SERVICE_GRPC_URL: str(),
 
   NODE_ENV: str({ choices: ["development", "test", "production"] }),
-
-  KAFKA_BROKERS: str(),
 });
 
 export default env;

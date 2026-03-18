@@ -8,9 +8,9 @@ import orderRouter from "@/routers/order.route";
 const app: Express = express();
 app.use(express.json());
 
-app.use("/api/v1/trade", tradeRouter);
-app.use("/api/v1/user", userRouter);
-app.use("/api/v1/order", orderRouter);
+app.use("/api/v1/trades", tradeRouter);
+app.use("/api/v1/users", userRouter);
+app.use("/api/v1/orders", orderRouter);
 
 app.get("/", (_, res) => {
   res.json({ message: "Hello World from Nerve trade platform's backend" });
