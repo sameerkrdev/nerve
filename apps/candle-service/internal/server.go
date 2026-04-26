@@ -3,31 +3,31 @@ package internal
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/sameerkrdev/nerve/apps/candle-service/internal/engine"
+	"github.com/sameerkrdev/nerve/apps/candle-service/internal/utils"
+	pbAggeration "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/aggeration/v1"
 )
 
-//* func: define mux server and start consumer and workers
-//* func: start the kafka consumer
-//* func: start the workers
-//*	 - each worker recieve gets single symbol trade data via channel
-//	 - calculate the candlestick data for multiple timeframe
-//	 - L1: In-memory (last 500 candles)
-//	 - L2: Redis Memory (last 5000 candles)
-//	 - L3: store the trades into clickhouse which will eventually generate the candles data
-//	 - publish to kafka or redis pub/sub for indicator service
-// func: to get the historical data of candles
-// func: graceful shutdown
+type Server struct {
+	router *engine.WorkerRouter
+}
 
-func NewServer() *http.ServeMux {
+func NewServer(router *engine.WorkerRouter) *http.ServeMux {
+	s := &Server{
+		router,
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", HealthCheck)
-	mux.HandleFunc("GET /candles", GetCandles)
+	mux.HandleFunc("GET /candles", s.GetCandles)
 
 	return mux
 }
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	res := APIReponse{
+	resp := utils.APIReponse{
 		Success: true,
 		Data: map[string]string{
 			"message": "Yooo!, I am healthy",
@@ -37,9 +37,36 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	json.NewEncoder(w).Encode(resp)
 }
 
-func GetCandles(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetCandles(w http.ResponseWriter, r *http.Request) {
+	symbol := r.URL.Query().Get("symbol")
+	interval := r.URL.Query().Get("timeframe")
 
+	if symbol == "" || interval == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(utils.APIReponse{Success: false, Error: "symbol and timeframe are required"})
+		return
+	}
+
+	timeframeEnumVal, ok := pbAggeration.Timeframe_value[interval]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(utils.APIReponse{Success: false, Error: "invalid timeframe"})
+		return
+	}
+
+	candles, err := s.router.GetCandles(symbol, pbAggeration.Timeframe(timeframeEnumVal))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode((utils.APIReponse{Success: false, Error: "something went wrong"}))
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(utils.APIReponse{Success: true, Data: candles})
 }

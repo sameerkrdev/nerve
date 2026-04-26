@@ -1,7 +1,9 @@
 package engine
 
 import (
-	"github.com/sameerkrdev/nerve/apps/candle-service/internal"
+	memorystore "github.com/sameerkrdev/nerve/apps/candle-service/internal/memoryStore"
+	"github.com/sameerkrdev/nerve/apps/candle-service/internal/utils"
+	pbAggeration "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/aggeration/v1"
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
@@ -10,11 +12,12 @@ type WorkerRouter struct {
 	count   int
 }
 
-func NewRouterWorker(numOfWorkers int) *WorkerRouter {
+func NewWorkerRouter(workerCount int) *WorkerRouter {
 	var workers []*Worker
 
-	for i := 0; i < numOfWorkers; i++ {
-		worker := NewWorker(i)
+	for i := range workerCount {
+		candleCache := memorystore.NewCandleStore()
+		worker := NewWorker(i, candleCache)
 
 		go worker.Process()
 
@@ -23,14 +26,19 @@ func NewRouterWorker(numOfWorkers int) *WorkerRouter {
 
 	return &WorkerRouter{
 		workers: workers,
-		count:   numOfWorkers,
+		count:   workerCount,
 	}
 }
 
-func (rw *WorkerRouter) Route(event *pb.EngineEvent) {
-	hashNum := int(internal.Hash(event.Symbol) % uint32(rw.count))
+func (wr *WorkerRouter) Route(event *pb.EngineEvent) {
+	workerIndex := int(utils.Hash(event.Symbol) % uint32(wr.count))
 
-	worker := rw.workers[hashNum]
+	worker := wr.workers[workerIndex]
 
-	worker.queue <- event
+	worker.eventQueue <- event
+}
+
+func (wr *WorkerRouter) GetCandles(symbol string, timeframe pbAggeration.Timeframe) ([]*pbAggeration.Candle, error) {
+	workerIndex := int(utils.Hash(symbol) % uint32(wr.count))
+	return wr.workers[workerIndex].candleCache.GetCandles(symbol, timeframe)
 }

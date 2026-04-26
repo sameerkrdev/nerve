@@ -11,12 +11,12 @@ import (
 	"github.com/IBM/sarama"
 )
 
-type KafkaClient struct {
+type KafkaConsumerClient struct {
 	group   sarama.ConsumerGroup
 	brokers []string
 }
 
-func NewKafkaClient(brokers []string) *KafkaClient {
+func NewKafkaConsumerClient(brokers []string) (*KafkaConsumerClient, error) {
 	config := sarama.NewConfig()
 
 	config.Consumer.Fetch.Default = 5 * 1024 * 1024
@@ -26,23 +26,23 @@ func NewKafkaClient(brokers []string) *KafkaClient {
 	config.Consumer.Offsets.AutoCommit.Interval = 2 * time.Second
 	config.Consumer.MaxWaitTime = 500 * time.Millisecond
 
-	client, err := sarama.NewConsumerGroup(brokers, "candle_service_group", config)
+	consumerGroup, err := sarama.NewConsumerGroup(brokers, "candle_service_group", config)
 
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return &KafkaClient{
-		group:   client,
+	return &KafkaConsumerClient{
+		group:   consumerGroup,
 		brokers: brokers,
-	}
+	}, nil
 }
 
-func (k *KafkaClient) Close() error {
+func (k *KafkaConsumerClient) Close() error {
 	return k.group.Close()
 }
 
-func (k *KafkaClient) Consume(
+func (k *KafkaConsumerClient) Consume(
 	topics []string,
 	handler sarama.ConsumerGroupHandler,
 ) {
@@ -57,11 +57,11 @@ func (k *KafkaClient) Consume(
 		}
 	}()
 
-	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-sigchan
+		<-sigCh
 		log.Println("shutting down kafka consumer...")
 		cancel()
 	}()

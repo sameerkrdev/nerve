@@ -1,30 +1,29 @@
 package engine
 
 import (
-	"github.com/sameerkrdev/nerve/apps/candle-service/internal"
+	memorystore "github.com/sameerkrdev/nerve/apps/candle-service/internal/memoryStore"
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 	"google.golang.org/protobuf/proto"
 )
 
 type Worker struct {
-	queue       chan *pb.EngineEvent
-	index       int
-	candleCache *internal.CandleInMemoryCache
+	eventQueue  chan *pb.EngineEvent
+	id          int
+	candleCache *memorystore.CandleStore
 }
 
-func NewWorker(index int, candleCache *internal.CandleInMemoryCache) *Worker {
-	queue := make(chan *pb.EngineEvent, 100000)
+func NewWorker(id int, candleCache *memorystore.CandleStore) *Worker {
+	eventQueue := make(chan *pb.EngineEvent, 100000)
 
 	return &Worker{
-		queue:       queue,
-		index:       index,
+		eventQueue:  eventQueue,
+		id:          id,
 		candleCache: candleCache,
 	}
 }
 
 func (w *Worker) Process() {
-	for event := range w.queue {
-		//
+	for event := range w.eventQueue {
 		tradeEvent := &pb.TradeEvent{}
 
 		proto.Unmarshal(event.Data, tradeEvent)
