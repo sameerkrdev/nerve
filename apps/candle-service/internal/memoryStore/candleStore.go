@@ -79,6 +79,7 @@ func (cache *CandleStore) AddNewCandle(
 
 		if activeCandle.OpenTime == openTimeBucket {
 			cache.updateCandle(activeCandle, tradeData)
+			PublishCandleEvent(symbol, tfName, store.current[tfName])
 			continue
 		}
 
@@ -87,8 +88,10 @@ func (cache *CandleStore) AddNewCandle(
 		store.history[tfName] = append(store.history[tfName], activeCandle)
 
 		store.current[tfName] = cache.newCandle(tradeData, tfName, tfSeconds, openTimeBucket)
-
 		store.history[tfName] = trim(store.history[tfName])
+
+		PushCandle(symbol, tfName, activeCandle)
+		PublishCandleEvent(symbol, tfName, activeCandle)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/engine"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/kafka"
+	memorystore "github.com/sameerkrdev/nerve/apps/candle-service/internal/memoryStore"
 )
 
 //* func: define mux server and start consumer and workers
@@ -19,13 +20,20 @@ import (
 //*	 - L1: In-memory (last 1000 candles)
 //	 - L2: Redis Memory (last 5000 candles)
 //	 - L3: store the trades into clickhouse which will eventually generate the candles data
-//	 - publish to kafka or redis pub/sub for indicator service
+//	 - Fanout:
+// 		- publish to kafka for other services
+// 		- redis pub/sub for websockets servers
 // func: to get the historical data of candles
 // func: graceful shutdown
 
 // in main or in server, initialize router workers, then initialize kafka consumer handler then initialize kafka client with consume func call
 
 func main() {
+	if err := memorystore.InitRedis(); err != nil {
+		slog.Error("redis init failed", "error", err)
+		os.Exit(1)
+	}
+
 	brokerAddresses := []string{
 		"localhost:536",
 		"",
