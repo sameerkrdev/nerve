@@ -7,6 +7,8 @@ import (
 	matchingEnigne "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
+type OnCandleClosedFn func(symbol, timeframe string, candle *pb.Candle)
+
 /*
 
 {
@@ -33,18 +35,20 @@ type SymbolStore struct {
 	history map[string][]*pb.Candle
 }
 
-type CandleStore map[string]*SymbolStore
+type CandleStore struct {
+	store          map[string]*SymbolStore
+	onCandleClosed OnCandleClosedFn
+}
 
-func NewCandleStore() *CandleStore {
-	cache := make(CandleStore)
-	return &cache
+func NewCandleStore(onCandleClosed OnCandleClosedFn) *CandleStore {
+	return &CandleStore{
+		store:          make(map[string]*SymbolStore),
+		onCandleClosed: onCandleClosed,
+	}
 }
 
 func (cache *CandleStore) getOrCreateSymbol(symbol string) *SymbolStore {
-
-	derefCache := *cache
-
-	if store, exists := derefCache[symbol]; exists {
+	if store, exists := cache.store[symbol]; exists {
 		return store
 	}
 
@@ -53,7 +57,7 @@ func (cache *CandleStore) getOrCreateSymbol(symbol string) *SymbolStore {
 		history: make(map[string][]*pb.Candle),
 	}
 
-	derefCache[symbol] = store
+	cache.store[symbol] = store
 
 	return store
 }
@@ -79,7 +83,7 @@ func (cache *CandleStore) AddNewCandle(
 
 		if activeCandle.OpenTime == openTimeBucket {
 			cache.updateCandle(activeCandle, tradeData)
-			PublishCandleEvent(symbol, tfName, store.current[tfName])
+			PublishCandleEventToRedis(symbol, tfName, store.current[tfName])
 			continue
 		}
 
@@ -90,8 +94,9 @@ func (cache *CandleStore) AddNewCandle(
 		store.current[tfName] = cache.newCandle(tradeData, tfName, tfSeconds, openTimeBucket)
 		store.history[tfName] = trim(store.history[tfName])
 
-		PushCandle(symbol, tfName, activeCandle)
-		PublishCandleEvent(symbol, tfName, activeCandle)
+		if cache.onCandleClosed != nil {
+			cache.onCandleClosed(symbol, tfName, activeCandle)
+		}
 	}
 }
 

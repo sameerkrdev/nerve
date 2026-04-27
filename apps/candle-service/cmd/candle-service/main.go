@@ -34,12 +34,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	brokerAddresses := []string{
-		"localhost:536",
-		"",
+	brokerAddresses := []string{"localhost:19092", "localhost:19093", "localhost:19094"}
+
+	if err := kafka.InitKafkaProducer(brokerAddresses); err != nil {
+		slog.Error("kafka producer init failed", "error", err)
+		os.Exit(1)
 	}
 
-	workerRouter := engine.NewWorkerRouter(10)
+	workerRouter := engine.NewWorkerRouter(10, kafka.PublishCandleEventToKafka)
 	mux := internal.NewServer(workerRouter)
 
 	kafkaConsumerClient, err := kafka.NewKafkaConsumerClient(brokerAddresses)

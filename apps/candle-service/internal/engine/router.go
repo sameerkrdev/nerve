@@ -12,11 +12,11 @@ type WorkerRouter struct {
 	count   int
 }
 
-func NewWorkerRouter(workerCount int) *WorkerRouter {
+func NewWorkerRouter(workerCount int, onCandleClosed memorystore.OnCandleClosedFn) *WorkerRouter {
 	var workers []*Worker
 
 	for i := range workerCount {
-		candleCache := memorystore.NewCandleStore()
+		candleCache := memorystore.NewCandleStore(onCandleClosed)
 		worker := NewWorker(i, candleCache)
 
 		go worker.Process()
