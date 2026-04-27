@@ -3,9 +3,6 @@ package kafka
 import (
 	"context"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -43,27 +40,17 @@ func (k *KafkaConsumerClient) Close() error {
 }
 
 func (k *KafkaConsumerClient) Consume(
+	ctx context.Context,
 	topics []string,
 	handler sarama.ConsumerGroupHandler,
 ) {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	defer k.Close()
 
+	// log errors
 	go func() {
 		for err := range k.group.Errors() {
 			log.Println("kafka error:", err)
 		}
-	}()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		<-sigCh
-		log.Println("shutting down kafka consumer...")
-		cancel()
 	}()
 
 	for {
@@ -71,7 +58,9 @@ func (k *KafkaConsumerClient) Consume(
 			log.Println("consumer error:", err)
 		}
 
+		// exit cleanly when context is cancelled
 		if ctx.Err() != nil {
+			log.Println("kafka consumer stopped")
 			return
 		}
 	}

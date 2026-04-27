@@ -24,58 +24,23 @@ message CandleBatch {
   repeated Candle candles = 3;
 }
 
-message GetCandlestickRequest {
+message GetCandlesRequest {
   string symbol = 1;
-  string currency = 2;
-  string timeframe = 3;
+  // string currency = 2;
+  Timeframe timeframe = 3;
   oneof method {
     int64 number_of_candlesticks = 4;
     DateRange date_range = 5;
   }
 }
 
-message GetCandlestickResponse {
+message GetCandlesResponse {
   oneof result {
     CandleBatch data = 1;
     Error error = 2;
   }
 }
 
-message CandleUpdate {
-  enum UpdateType {
-    UPDATE_TYPE_UNSPECIFIED = 0;
-    UPDATE_TYPE_NEW = 1; // New candle created
-    UPDATE_TYPE_UPDATE = 2; // Existing candle updated
-    UPDATE_TYPE_CLOSE = 3; // Candle closed (finalized)
-  }
-
-  UpdateType type = 1;
-  Candle candle = 2;
-
-  int64 timestamp = 3;
-}
-
-message SubscribeCandlesRequest {
-  string symbol = 1;
-  repeated Timeframe timeframes = 2;
-}
-
-message SubscriptionConfirmation {
-  string symbol = 1;
-  Timeframe timeframe = 2;
-  string subscription_id = 3;
-}
-
-message CandleStreamMessage {
-  oneof message {
-    CandleUpdate update = 1;
-    SubscriptionConfirmation confirmation = 2;
-    Error error = 3;
-  }
-}
-
 service CandleService {
-  rpc GetCandles(GetCandlestickRequest) returns (GetCandlestickResponse);
-
-  rpc SubscribeCandles(stream SubscribeCandlesRequest) returns (stream CandleStreamMessage);
+  rpc GetCandles(GetCandlesRequest) returns (GetCandlesResponse);
 }

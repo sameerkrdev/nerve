@@ -1,7 +1,6 @@
 package kafka
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/IBM/sarama"
 	pbAggegration "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/aggeration/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -55,7 +55,7 @@ func InitKafkaProducer(brokers []string) error {
 
 func PublishCandleEventToKafka(symbol string, timeframe string, candle *pbAggegration.Candle) {
 
-	value, err := json.Marshal(candle)
+	value, err := proto.Marshal(candle)
 	if err != nil {
 		log.Println("marshal error:", err)
 		return

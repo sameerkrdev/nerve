@@ -1,10 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
-	"net/http"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/engine"
@@ -12,7 +14,7 @@ import (
 	memorystore "github.com/sameerkrdev/nerve/apps/candle-service/internal/memoryStore"
 )
 
-//* func: define mux server and start consumer and workers
+//* func: define grpc server and start consumer and workers
 //* func: start the kafka consumer
 //* func: start the workers
 //*	 - each worker recieve gets single symbol trade data via channel
@@ -42,7 +44,7 @@ func main() {
 	}
 
 	workerRouter := engine.NewWorkerRouter(10, kafka.PublishCandleEventToKafka)
-	mux := internal.NewServer(workerRouter)
+	// mux := internal.NewServer(workerRouter)
 
 	kafkaConsumerClient, err := kafka.NewKafkaConsumerClient(brokerAddresses)
 	if err != nil {
@@ -56,17 +58,30 @@ func main() {
 		"trades",
 	}
 
-	go kafkaConsumerClient.Consume(topics, kafkaConsumerHandler)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go kafkaConsumerClient.Consume(ctx, topics, kafkaConsumerHandler)
 
-	server := &http.Server{
-		Addr:    ":50054",
-		Handler: mux,
-	}
+	PORT := "50054"
 
-	fmt.Println("Server is running on PORT: 50054")
-
-	if err := server.ListenAndServe(); err != nil {
-		slog.Error("Server failed", "error", err)
+	listener, err := net.Listen("tcp", ":"+PORT)
+	if err != nil {
+		slog.Error("net server failed", "error", err)
 		os.Exit(1)
 	}
+
+	slog.Info("Net server listening", "port", PORT)
+
+	grpcServer := internal.NewGrpcServer(workerRouter, listener)
+
+	// graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	<-quit
+
+	slog.Info("shutting down...")
+
+	cancel()
+	grpcServer.GracefulStop()
 }
