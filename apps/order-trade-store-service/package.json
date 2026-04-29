@@ -1,5 +1,5 @@
 {
-  "name": "@repo/order-worker-service",
+  "name": "@repo/order-trade-store-service",
   "version": "1.0.0",
   "description": "",
   "main": "src/index.ts",

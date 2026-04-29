@@ -20,11 +20,11 @@ import (
 //*	 - each worker recieve gets single symbol trade data via channel
 //*	 - calculate the candlestick data for multiple timeframe
 //*	 - L1: In-memory (last 1000 candles)
-//	 - L2: Redis Memory (last 5000 candles)
+//*	 - L2: Redis Memory (last 5000 candles)
 //	 - L3: store the trades into clickhouse which will eventually generate the candles data
-//	 - Fanout:
-// 		- publish to kafka for other services
-// 		- redis pub/sub for websockets servers
+//*	 - Fanout:
+//* 		- publish to kafka for other services
+//* 		- redis pub/sub for websockets servers
 // func: to get the historical data of candles
 // func: graceful shutdown
 

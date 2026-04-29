@@ -3,6 +3,7 @@ go 1.26.1
 use (
 	./apps/candle-service
 	./apps/matching-engine
+	./apps/trade-ingestor-service
 	./apps/websocket-server
 	./packages/proto-defs/go/generated
 )

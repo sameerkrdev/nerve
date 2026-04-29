@@ -1,0 +1,5 @@
+package clickhouse
+
+func FetchCandles() {
+
+}
