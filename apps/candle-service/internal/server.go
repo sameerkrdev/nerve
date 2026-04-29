@@ -37,6 +37,7 @@ func NewGrpcServer(router *engine.WorkerRouter, netListener net.Listener) *grpc.
 	return srv
 }
 
+// TODO: Implement the from, to feature :- inmemory, redis, clickhouse
 func (s *Server) GetCandles(ctx context.Context, req *pbAggeration.GetCandlesRequest) (*pbAggeration.GetCandlesResponse, error) {
 	tf := req.GetTimeframe()
 	symbol := req.GetSymbol()

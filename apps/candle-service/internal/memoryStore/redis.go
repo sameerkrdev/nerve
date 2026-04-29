@@ -16,21 +16,21 @@ var (
 	RedisClient *redis.Client
 	once        sync.Once
 	ctx         = context.Background()
+	initErr     error
 )
 
 func InitRedis() error {
-	var err error
 	once.Do(func() {
 		opt, err := redis.ParseURL("rediss://default:gQAAAAAAATZNAAIgcDEyNDllZDYyYWM5ZTk0NTgo:6379")
 		if err != nil {
-			err = fmt.Errorf("parse error %w", err)
+			initErr = fmt.Errorf("parse error %w", err)
 			return
 		}
 
 		client := redis.NewClient(opt)
 
 		if e := client.Ping(ctx).Err(); e != nil {
-			err = fmt.Errorf("connection error: %w", e)
+			initErr = fmt.Errorf("connection error: %w", e)
 			return
 		}
 
@@ -38,7 +38,7 @@ func InitRedis() error {
 
 		RedisClient = client
 	})
-	return err
+	return initErr
 }
 
 func candleKey(symbol, timeframe string) string {

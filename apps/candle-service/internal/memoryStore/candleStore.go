@@ -149,7 +149,6 @@ func (cache *CandleStore) GetCandles(
 		return nil, fmt.Errorf("invalid interval")
 	}
 
-	// TODO: Implement the from, to feature :- inmemory, redis, clickhouse
 	candles := store.history[tfName]
 
 	return candles, nil
