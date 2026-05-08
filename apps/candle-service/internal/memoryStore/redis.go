@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 
@@ -21,7 +22,13 @@ var (
 
 func InitRedis() error {
 	once.Do(func() {
-		opt, err := redis.ParseURL("rediss://default:gQAAAAAAATZNAAIgcDEyNDllZDYyYWM5ZTk0NTgo:6379")
+		REDIS_URL := os.Getenv("REDIS_URL")
+		if REDIS_URL == "" {
+			initErr = fmt.Errorf("REDIS_URL is required")
+			return
+		}
+
+		opt, err := redis.ParseURL(REDIS_URL)
 		if err != nil {
 			initErr = fmt.Errorf("parse error %w", err)
 			return

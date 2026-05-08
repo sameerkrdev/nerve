@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -21,14 +22,14 @@ func NewClickhouseClient(ctx context.Context) (driver.Conn, error) {
 		var conn driver.Conn
 
 		conn, initErr = clickhouse.Open(&clickhouse.Options{
-			Addr:     []string{"zjc5ukn020.eu-west-2.aws.clickhouse.cloud:9440"}, // 9440 is a secure native TCP port
+			Addr:     []string{os.Getenv("CLICKHOUSE_ADDR")},
 			Protocol: clickhouse.Native,
 			TLS: &tls.Config{
 				InsecureSkipVerify: true,
-			}, // enable secure TLS
+			},
 			Auth: clickhouse.Auth{
-				Username: "default",
-				Password: "9FzzlTeRu~V5V",
+				Username: os.Getenv("CLICKHOUSE_USER"),
+				Password: os.Getenv("CLICKHOUSE_PASSWORD"),
 			},
 		})
 

@@ -5,8 +5,10 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/sameerkrdev/nerve/apps/trade-ingestor-service/internal/clickhouse"
 	"github.com/sameerkrdev/nerve/apps/trade-ingestor-service/internal/kafka"
 )
@@ -15,6 +17,8 @@ import (
 // TODO: make a fucntion to insert the trade batch to clichouse --> InsertTrades([]*Trade)
 // TODO: make a trade batching system which flush the buffer data to clichouse after some interval 50ms and mark the kafka mark msg
 func main() {
+	godotenv.Load()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -24,7 +28,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	brokerAddresses := []string{"localhost:19092", "localhost:19093", "localhost:19094"}
+	brokersEnv := os.Getenv("KAFKA_BROKERS")
+	if brokersEnv == "" {
+		brokersEnv = "localhost:19092,localhost:19093,localhost:19094"
+	}
+	brokerAddresses := strings.Split(brokersEnv, ",")
 	_, err = kafka.InitKafkaConsumerClient(brokerAddresses)
 	if err != nil {
 		slog.Error("Kafka init failed", "error", err)

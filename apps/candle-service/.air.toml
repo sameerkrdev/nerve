@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/candle-service ./cmd/candle-service"
-bin = "tmp/candle-service"
+cmd = "go build -o ./tmp/candle-service.exe ./cmd/candle-service"
+bin = "tmp/candle-service.exe"
 
 include_ext = ["go"]
 
@@ -19,9 +19,6 @@ exclude_dir = [
 ]
 
 delay = 200
-
-[run]
-cmd = "./tmp/candle-service"
 
 [log]
 time = true

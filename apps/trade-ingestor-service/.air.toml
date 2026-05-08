@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/trader-ingestor-service ./cmd/trader-ingestor-service"
-bin = "tmp/trader-ingestor-service"
+cmd = "go build -o ./tmp/trade-ingestor-service.exe ./cmd/trade-ingestor-service"
+bin = "tmp/trade-ingestor-service.exe"
 
 include_ext = ["go"]
 
@@ -19,9 +19,6 @@ exclude_dir = [
 ]
 
 delay = 200
-
-[run]
-cmd = "./tmp/trader-ingestor-service"
 
 [log]
 time = true

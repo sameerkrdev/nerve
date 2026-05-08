@@ -6,8 +6,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/engine"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/kafka"
@@ -31,12 +33,15 @@ import (
 // in main or in server, initialize router workers, then initialize kafka consumer handler then initialize kafka client with consume func call
 
 func main() {
+
+	godotenv.Load()
+
 	if err := memorystore.InitRedis(); err != nil {
 		slog.Error("redis init failed", "error", err)
 		os.Exit(1)
 	}
 
-	brokerAddresses := []string{"localhost:19092", "localhost:19093", "localhost:19094"}
+	brokerAddresses := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
 
 	if err := kafka.InitKafkaProducer(brokerAddresses); err != nil {
 		slog.Error("kafka producer init failed", "error", err)
@@ -62,7 +67,7 @@ func main() {
 	defer cancel()
 	go kafkaConsumerClient.Consume(ctx, topics, kafkaConsumerHandler)
 
-	PORT := "50054"
+	PORT := os.Getenv("PORT")
 
 	listener, err := net.Listen("tcp", ":"+PORT)
 	if err != nil {

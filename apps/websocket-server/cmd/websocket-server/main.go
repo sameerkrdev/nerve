@@ -1,26 +1,39 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
+	"os"
 
+	"github.com/joho/godotenv"
 	internal "github.com/sameerkrdev/nerve/apps/websocket-server/internal"
 )
 
 func main() {
+	godotenv.Load()
+
+	engineURL := os.Getenv("MATCHING_ENGINE_GRPC_URL")
+	if engineURL == "" {
+		engineURL = "localhost:50052"
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "50053"
+	}
+
 	wsg := internal.NewWSGateway()
-	wsg.ConnectToEngine("localhost:50052")
+	wsg.ConnectToEngine(engineURL)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/ws", wsg.HandelWebsocket)
 
 	server := &http.Server{
-		Addr:    ":50053",
+		Addr:    ":" + port,
 		Handler: mux,
 	}
 
-	fmt.Println("Server is running on PORT: 50053")
+	log.Printf("Server is running on PORT: %s", port)
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)

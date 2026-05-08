@@ -28,7 +28,7 @@ func StartActors(symbols []Symbol) {
 			log.Fatalln("Failed to start actor", symbols, err)
 		}
 
-		// 1. Load snapshot (if exists)
+		// 1. Load snapshot (if exists) --> TODO
 		// 2. Replay WAL (blocking)
 		slog.Info(fmt.Sprintf("replaying the %s orderbook Starting...", sym.Name))
 		err = actor.replayWal(0)
@@ -42,7 +42,7 @@ func StartActors(symbols []Symbol) {
 		// 3. Start other workers owned by actor
 		go actor.wal.keepSyncing()
 		go actor.kafkaEmitter.Run()
-		// go actor.snapshotWorker()
+		// go actor.snapshotWorker() --> TODO
 
 		// 4. Start actor loop LAST
 		go actor.Run()

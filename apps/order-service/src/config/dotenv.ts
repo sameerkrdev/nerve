@@ -3,7 +3,7 @@ import { cleanEnv, str } from "envalid";
 import path from "path";
 
 config({
-  path: path.join(__dirname, `../../.env.${process.env.NODE_ENV || "development"}`),
+  path: path.join(__dirname, `../../.env`),
 });
 
 export const env = cleanEnv(process.env, {

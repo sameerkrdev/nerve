@@ -20,6 +20,7 @@ const credentials =
 const orderClient = new OrderServiceClient(ORDER_SERVICE_GRPC_URL, credentials, {
   "grpc.keepalive_time_ms": 30000,
   "grpc.keepalive_timeout_ms": 10000,
+  "grpc.enable_retries": 3,
 });
 
 logger.info(`Connected to Order gRPC service at ${ORDER_SERVICE_GRPC_URL}`);
