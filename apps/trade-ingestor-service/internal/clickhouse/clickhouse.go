@@ -26,6 +26,7 @@ func NewClickhouseClient(ctx context.Context) (driver.Conn, error) {
 			Protocol: clickhouse.Native,
 			TLS:      &tls.Config{},
 			Auth: clickhouse.Auth{
+				Database: os.Getenv("CLICKHOUSE_DATABASE"),
 				Username: os.Getenv("CLICKHOUSE_USER"),
 				Password: os.Getenv("CLICKHOUSE_PASSWORD"),
 			},

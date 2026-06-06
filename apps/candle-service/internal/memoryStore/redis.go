@@ -96,7 +96,12 @@ func GetCandlesFromRedis(symbol, timeframe string, count int64) ([]*pb.Candle, e
 }
 
 func PublishCandleEventToRedis(symbol string, timeframe string, candle *pb.Candle) {
-	if err := RedisClient.Publish(ctx, candleKey(symbol, timeframe), candle).Err(); err != nil {
-		slog.Error("failed to pulish candle event", "error", err)
+	data, err := proto.Marshal(candle)
+	if err != nil {
+		slog.Error("failed to marshal candle for publish", "error", err)
+		return
+	}
+	if err := RedisClient.Publish(ctx, candleKey(symbol, timeframe), data).Err(); err != nil {
+		slog.Error("failed to publish candle event", "error", err)
 	}
 }

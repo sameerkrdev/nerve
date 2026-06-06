@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net"
 
 	"google.golang.org/grpc"
@@ -10,18 +11,23 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/sameerkrdev/nerve/apps/candle-service/internal/clickhouse"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/engine"
+	memorystore "github.com/sameerkrdev/nerve/apps/candle-service/internal/memoryStore"
 	pbAggeration "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/aggeration/v1"
 )
 
 type Server struct {
-	router *engine.WorkerRouter
+	router          *engine.WorkerRouter
+	clickhouseConn  driver.Conn
 	pbAggeration.UnimplementedCandleServiceServer
 }
 
-func NewGrpcServer(router *engine.WorkerRouter, netListener net.Listener) *grpc.Server {
+func NewGrpcServer(router *engine.WorkerRouter, clickhouseConn driver.Conn, netListener net.Listener) *grpc.Server {
 	s := &Server{
-		router: router,
+		router:         router,
+		clickhouseConn: clickhouseConn,
 	}
 
 	srv := grpc.NewServer()
@@ -37,7 +43,6 @@ func NewGrpcServer(router *engine.WorkerRouter, netListener net.Listener) *grpc.
 	return srv
 }
 
-// TODO: Implement the from, to feature :- inmemory, redis, clickhouse
 func (s *Server) GetCandles(ctx context.Context, req *pbAggeration.GetCandlesRequest) (*pbAggeration.GetCandlesResponse, error) {
 	tf := req.GetTimeframe()
 	symbol := req.GetSymbol()
@@ -45,14 +50,42 @@ func (s *Server) GetCandles(ctx context.Context, req *pbAggeration.GetCandlesReq
 	if symbol == "" {
 		return nil, status.Error(codes.InvalidArgument, "symbol is required")
 	}
-
 	if tf == pbAggeration.Timeframe_TIMEFRAME_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "invalid timeframe")
 	}
 
+	count := req.GetNumberOfCandlesticks()
+	if count <= 0 {
+		count = 500
+	}
+
+	tfName, ok := pbAggeration.Timeframe_name[int32(tf)]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "invalid timeframe")
+	}
+
+	// L1: in-memory
 	candles, err := s.router.GetCandles(symbol, tf)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "something went wrong. try again later")
+	}
+
+	// L2: Redis
+	if len(candles) == 0 {
+		candles, err = memorystore.GetCandlesFromRedis(symbol, tfName, count)
+		if err != nil {
+			slog.Warn("redis L2 miss", "symbol", symbol, "timeframe", tfName, "error", err)
+			candles = nil
+		}
+	}
+
+	// L3: ClickHouse — aggregate OHLCV from trades table on-the-fly
+	if len(candles) == 0 && s.clickhouseConn != nil {
+		candles, err = clickhouse.FetchCandles(ctx, s.clickhouseConn, symbol, int32(tf), count)
+		if err != nil {
+			slog.Error("clickhouse L3 fetch failed", "error", err)
+			return nil, status.Error(codes.Internal, "something went wrong. try again later")
+		}
 	}
 
 	candleBatch := &pbAggeration.CandleBatch{
@@ -60,56 +93,7 @@ func (s *Server) GetCandles(ctx context.Context, req *pbAggeration.GetCandlesReq
 		Timeframe: tf,
 		Candles:   candles,
 	}
-	response := &pbAggeration.GetCandlesResponse{
-		Result: &pbAggeration.GetCandlesResponse_Data{
-			Data: candleBatch,
-		},
-	}
-
-	return response, nil
+	return &pbAggeration.GetCandlesResponse{
+		Result: &pbAggeration.GetCandlesResponse_Data{Data: candleBatch},
+	}, nil
 }
-
-// func HealthCheck(w http.ResponseWriter, r *http.Request) {
-// 	resp := utils.APIReponse{
-// 		Success: true,
-// 		Data: map[string]string{
-// 			"message": "Yooo!, I am healthy",
-// 		},
-// 		Error: "",
-// 	}
-
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(resp)
-// }
-
-// func (s *Server) GetCandles(w http.ResponseWriter, r *http.Request) {
-// 	symbol := r.URL.Query().Get("symbol")
-// 	interval := r.URL.Query().Get("timeframe")
-
-// 	if symbol == "" || interval == "" {
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		w.Header().Set("Content-Type", "application/json")
-// 		json.NewEncoder(w).Encode(utils.APIReponse{Success: false, Error: "symbol and timeframe are required"})
-// 		return
-// 	}
-
-// 	timeframeEnumVal, ok := pbAggeration.Timeframe_value[interval]
-// 	if !ok {
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		w.Header().Set("Content-Type", "application/json")
-// 		json.NewEncoder(w).Encode(utils.APIReponse{Success: false, Error: "invalid timeframe"})
-// 		return
-// 	}
-
-// 	candles, err := s.router.GetCandles(symbol, pbAggeration.Timeframe(timeframeEnumVal))
-// 	if err != nil {
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		w.Header().Set("Content-Type", "application/json")
-// 		json.NewEncoder(w).Encode((utils.APIReponse{Success: false, Error: "something went wrong"}))
-// 	}
-
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(utils.APIReponse{Success: true, Data: candles})
-// }

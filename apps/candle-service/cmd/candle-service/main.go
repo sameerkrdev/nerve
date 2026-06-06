@@ -11,34 +11,28 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal"
+	clickhousepkg "github.com/sameerkrdev/nerve/apps/candle-service/internal/clickhouse"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/engine"
 	"github.com/sameerkrdev/nerve/apps/candle-service/internal/kafka"
 	memorystore "github.com/sameerkrdev/nerve/apps/candle-service/internal/memoryStore"
+	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/aggeration/v1"
 )
 
-//* func: define grpc server and start consumer and workers
-//* func: start the kafka consumer
-//* func: start the workers
-//*	 - each worker recieve gets single symbol trade data via channel
-//*	 - calculate the candlestick data for multiple timeframe
-//*	 - L1: In-memory (last 1000 candles)
-//*	 - L2: Redis Memory (last 5000 candles)
-//	 - L3: store the trades into clickhouse which will eventually generate the candles data
-//*	 - Fanout:
-//* 		- publish to kafka for other services
-//* 		- redis pub/sub for websockets servers
-// func: to get the historical data of candles
-// func: graceful shutdown
-
-// in main or in server, initialize router workers, then initialize kafka consumer handler then initialize kafka client with consume func call
-
 func main() {
-
 	godotenv.Load()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	if err := memorystore.InitRedis(); err != nil {
 		slog.Error("redis init failed", "error", err)
 		os.Exit(1)
+	}
+
+	chConn, err := clickhousepkg.NewClickhouseClient(ctx)
+	if err != nil {
+		slog.Warn("clickhouse init failed — L3 disabled", "error", err)
+		chConn = nil
 	}
 
 	brokerAddresses := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
@@ -48,8 +42,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	workerRouter := engine.NewWorkerRouter(10, kafka.PublishCandleEventToKafka)
-	// mux := internal.NewServer(workerRouter)
+	onCandleClosed := func(symbol, timeframe string, candle *pb.Candle) {
+		if err := memorystore.PushCandle(symbol, timeframe, candle); err != nil {
+			slog.Error("redis L2 push failed", "symbol", symbol, "timeframe", timeframe, "error", err)
+		}
+		kafka.PublishCandleEventToKafka(symbol, timeframe, candle)
+	}
+
+	workerRouter := engine.NewWorkerRouter(10, onCandleClosed)
 
 	kafkaConsumerClient, err := kafka.NewKafkaConsumerClient(brokerAddresses)
 	if err != nil {
@@ -59,12 +59,8 @@ func main() {
 
 	kafkaConsumerHandler := kafka.NewConsumerHandler(workerRouter)
 
-	topics := []string{
-		"trades",
-	}
+	topics := []string{"trades"}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	go kafkaConsumerClient.Consume(ctx, topics, kafkaConsumerHandler)
 
 	PORT := os.Getenv("PORT")
@@ -77,9 +73,8 @@ func main() {
 
 	slog.Info("Net server listening", "port", PORT)
 
-	grpcServer := internal.NewGrpcServer(workerRouter, listener)
+	grpcServer := internal.NewGrpcServer(workerRouter, chConn, listener)
 
-	// graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 

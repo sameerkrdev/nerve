@@ -28,6 +28,7 @@ func NewClickhouseClient(ctx context.Context) (driver.Conn, error) {
 				InsecureSkipVerify: true,
 			},
 			Auth: clickhouse.Auth{
+				Database: os.Getenv("CLICKHOUSE_DATABASE"),
 				Username: os.Getenv("CLICKHOUSE_USER"),
 				Password: os.Getenv("CLICKHOUSE_PASSWORD"),
 			},

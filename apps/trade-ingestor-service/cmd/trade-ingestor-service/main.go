@@ -7,24 +7,27 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/sameerkrdev/nerve/apps/trade-ingestor-service/internal/clickhouse"
 	"github.com/sameerkrdev/nerve/apps/trade-ingestor-service/internal/kafka"
 )
 
-// Kafka and clickhouse connection is now completed
-// TODO: make a fucntion to insert the trade batch to clichouse --> InsertTrades([]*Trade)
-// TODO: make a trade batching system which flush the buffer data to clichouse after some interval 50ms and mark the kafka mark msg
 func main() {
 	godotenv.Load()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	_, err := clickhouse.NewClickhouseClient(ctx)
+	chConn, err := clickhouse.NewClickhouseClient(ctx)
 	if err != nil {
-		slog.Error("Clickhouse init failed", "error", err)
+		slog.Error("clickhouse init failed", "error", err)
+		os.Exit(1)
+	}
+
+	if err := clickhouse.EnsureSchema(ctx, chConn); err != nil {
+		slog.Error("clickhouse schema setup failed", "error", err)
 		os.Exit(1)
 	}
 
@@ -33,17 +36,19 @@ func main() {
 		brokersEnv = "localhost:19092,localhost:19093,localhost:19094"
 	}
 	brokerAddresses := strings.Split(brokersEnv, ",")
+
 	_, err = kafka.InitKafkaConsumerClient(brokerAddresses)
 	if err != nil {
-		slog.Error("Kafka init failed", "error", err)
+		slog.Error("kafka init failed", "error", err)
 		os.Exit(1)
 	}
 
-	consumerHandler := kafka.NewConsumerHandler()
+	batcher := clickhouse.NewTradeBatcher(chConn, 500, 50*time.Millisecond)
+	go batcher.Start(ctx)
 
-	topics := []string{
-		"trades",
-	}
+	consumerHandler := kafka.NewConsumerHandler(batcher)
+
+	topics := []string{"trades"}
 
 	go kafka.Consume(ctx, topics, consumerHandler)
 
@@ -53,4 +58,5 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down...")
+	cancel()
 }
