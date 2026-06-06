@@ -49,18 +49,15 @@ Started: 2026-06-02
 
 ## Phase 2 — Real-Time WebSocket for Market Data (Day 4)
 
-### 4. websocket-server — candle + indicator streams `apps/websocket-server` 🔄
+### 4. websocket-server — candle + indicator streams `apps/websocket-server` ✅
 
 - ✅ WS gateway — connects to matching-engine via gRPC streaming
 - ✅ Broadcasts: depth, ticker, order events, trade events
-- ❌ No candle stream (subscribe to Redis pub/sub candle channel)
-- ❌ No indicator stream
-
-**Remaining work:**
-
-- Add Redis pub/sub subscriber goroutine per (symbol, timeframe)
-- Fan-out candle/indicator messages to subscribed WS clients
-- Message type routing: `subscribe:candles:BTCUSD:1m`
+- ✅ Candle stream — Redis pub/sub per (symbol, timeframe), fan-out to subscribers
+- ✅ `subscribe_candles` / `unsubscribe_candles` message routing
+- ✅ Auto-reconnect on Redis drop (only if users still subscribed)
+- ✅ Pre-encode JSON once at fan-out time (zero per-user marshal work)
+- ❌ No indicator stream (indicator-service not built yet)
 
 ---
 

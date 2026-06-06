@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +13,15 @@ import (
 func main() {
 	godotenv.Load()
 
+	redisClient, err := internal.InitRedis()
+	if err != nil {
+		log.Fatalf("redis init failed: %v", err)
+	}
+
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		log.Fatalf("redis ping failed: %v", err)
+	}
+
 	engineURL := os.Getenv("MATCHING_ENGINE_GRPC_URL")
 	if engineURL == "" {
 		engineURL = "localhost:50052"
@@ -22,7 +32,7 @@ func main() {
 		port = "50053"
 	}
 
-	wsg := internal.NewWSGateway()
+	wsg := internal.NewWSGateway(redisClient)
 	wsg.ConnectToEngine(engineURL)
 
 	mux := http.NewServeMux()
@@ -33,9 +43,9 @@ func main() {
 		Handler: mux,
 	}
 
-	log.Printf("Server is running on PORT: %s", port)
+	log.Printf("websocket server running on port %s", port)
 
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		log.Fatalf("server failed: %v", err)
 	}
 }
