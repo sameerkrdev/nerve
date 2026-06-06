@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	internal "github.com/sameerkrdev/nerve/apps/websocket-server/internal"
@@ -33,19 +37,40 @@ func main() {
 	}
 
 	wsg := internal.NewWSGateway(redisClient)
-	wsg.ConnectToEngine(engineURL)
+
+	if err := wsg.ConnectToEngine(engineURL); err != nil {
+		log.Fatalf("engine connect failed: %v", err)
+	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/ws", wsg.HandelWebsocket)
+	mux.HandleFunc("GET /api/v1/ws", wsg.HandleWebSocket)
 
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 
-	log.Printf("websocket server running on port %s", port)
+	go func() {
+		slog.Info("websocket server listening", "port", port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("server failed: %v", err)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("shutting down...")
+
+	wsg.Shutdown()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("server shutdown failed: %v", err)
 	}
+
+	slog.Info("shutdown complete")
 }
