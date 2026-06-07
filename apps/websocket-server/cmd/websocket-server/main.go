@@ -14,6 +14,7 @@ import (
 	internal "github.com/sameerkrdev/nerve/apps/websocket-server/internal"
 )
 
+
 func main() {
 	godotenv.Load()
 
@@ -26,21 +27,12 @@ func main() {
 		log.Fatalf("redis ping failed: %v", err)
 	}
 
-	engineURL := os.Getenv("MATCHING_ENGINE_GRPC_URL")
-	if engineURL == "" {
-		engineURL = "localhost:50052"
-	}
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "50053"
 	}
 
 	wsg := internal.NewWSGateway(redisClient)
-
-	if err := wsg.ConnectToEngine(engineURL); err != nil {
-		log.Fatalf("engine connect failed: %v", err)
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/ws", wsg.HandleWebSocket)

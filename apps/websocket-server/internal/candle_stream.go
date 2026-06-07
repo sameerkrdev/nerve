@@ -11,38 +11,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// handleSubscribeCandles validates and subscribes user to a candle stream.
-func (wsg *WSGateway) handleSubscribeCandles(user *User, msg UserMessage) {
-	if msg.Symbol == "" || !timeframeValid(msg.Timeframe) {
-		slog.Warn("invalid subscribe_candles request", "user", user.ID, "symbol", msg.Symbol, "timeframe", msg.Timeframe)
-		return
-	}
-	wsg.subscribeToCandle(user, msg.Symbol, msg.Timeframe)
-}
-
-// handleUnsubscribeCandles removes user from a candle stream.
-func (wsg *WSGateway) handleUnsubscribeCandles(user *User, msg UserMessage) {
-	if msg.Symbol == "" || msg.Timeframe == "" {
-		return
-	}
-	key := candleKey(msg.Symbol, msg.Timeframe)
-	if user.candles[key] {
-		wsg.unsubscribeCandle(user, key)
-	}
-}
-
-// subscribeToCandle adds user to the fan-out set for key, starting the Redis PubSub if needed.
 func (wsg *WSGateway) subscribeToCandle(user *User, symbol, timeframe string) {
 	key := candleKey(symbol, timeframe)
 
 	if user.candles[key] {
-		return // idempotent
+		return
 	}
 
 	wsg.candleStreamsMu.Lock()
 
 	if _, exists := wsg.candleStreams[key]; exists {
-		// goroutine already running — add user to fan-out set
 		wsg.candleUsersMu.Lock()
 		wsg.candleUsers[key][user] = true
 		wsg.candleUsersMu.Unlock()
@@ -53,7 +31,6 @@ func (wsg *WSGateway) subscribeToCandle(user *User, symbol, timeframe string) {
 		return
 	}
 
-	// first subscriber — start PubSub goroutine
 	pubsub := wsg.redisClient.Subscribe(wsg.ctx, key)
 	wsg.candleStreams[key] = pubsub
 
@@ -68,8 +45,6 @@ func (wsg *WSGateway) subscribeToCandle(user *User, symbol, timeframe string) {
 	go wsg.receiveCandleFromRedis(key, pubsub)
 }
 
-// unsubscribeCandle removes user from a candle stream by key.
-// Closes the PubSub when no subscribers remain.
 func (wsg *WSGateway) unsubscribeCandle(user *User, key string) {
 	wsg.candleStreamsMu.Lock()
 	defer wsg.candleStreamsMu.Unlock()
@@ -91,8 +66,6 @@ func (wsg *WSGateway) unsubscribeCandle(user *User, key string) {
 	}
 }
 
-// receiveCandleFromRedis reads from pubsub, JSON-encodes once, fans out to all subscribers.
-// Reconnects automatically on Redis drop (only if subscribers still exist).
 func (wsg *WSGateway) receiveCandleFromRedis(key string, pubsub *redis.PubSub) {
 	defer func() {
 		wsg.candleStreamsMu.Lock()
@@ -119,7 +92,6 @@ func (wsg *WSGateway) receiveCandleFromRedis(key string, pubsub *redis.PubSub) {
 			continue
 		}
 
-		// encode JSON once, reuse across all N subscribers
 		payload, err := json.Marshal(&CandleWSPayload{
 			EventType: "candle",
 			Symbol:    symbol,
@@ -146,7 +118,6 @@ func (wsg *WSGateway) receiveCandleFromRedis(key string, pubsub *redis.PubSub) {
 	}
 }
 
-// reconnectCandleStream re-establishes a Redis PubSub for key if subscribers still exist.
 func (wsg *WSGateway) reconnectCandleStream(key string) {
 	wsg.candleUsersMu.RLock()
 	hasUsers := len(wsg.candleUsers[key]) > 0

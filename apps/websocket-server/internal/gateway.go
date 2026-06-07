@@ -12,10 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	pbType "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
-	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/keepalive"
 )
 
 const (
@@ -26,7 +22,6 @@ const (
 	reconnectDelay  = time.Second
 )
 
-// Event is the internal message passed from broadcaster goroutines to writePump.
 type Event struct {
 	EventType pbType.EventType
 	Data      []byte
@@ -36,25 +31,21 @@ type WSGateway struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// gRPC engine connection
-	engineConn *grpc.ClientConn
+	depthStreams   map[string]*redis.PubSub
+	depthStreamsMu sync.RWMutex
+	depthUsers     map[string]map[*User]bool
+	depthUsersMu   sync.RWMutex
 
-	// one gRPC stream per symbol
-	symbolStreams   map[string]pb.MatchingEngine_SubscribeSymbolClient
-	symbolStreamsMu sync.RWMutex
+	tickerStreams   map[string]*redis.PubSub
+	tickerStreamsMu sync.RWMutex
+	tickerUsers     map[string]map[*User]bool
+	tickerUsersMu   sync.RWMutex
 
-	// symbol → users (depth / ticker fan-out)
-	symbolUsers   map[string]map[*User]bool
-	symbolUsersMu sync.RWMutex
-
-	// all connected users by ID (order / trade routing)
-	// populated on connect, removed on disconnect — NOT on subscribe/unsubscribe
 	connectedUsers   map[string]*User
 	connectedUsersMu sync.RWMutex
 
-	// Redis candle pub/sub
 	redisClient     *redis.Client
-	candleStreams   map[string]*redis.PubSub
+	candleStreams    map[string]*redis.PubSub
 	candleStreamsMu sync.RWMutex
 	candleUsers     map[string]map[*User]bool
 	candleUsersMu   sync.RWMutex
@@ -67,8 +58,10 @@ func NewWSGateway(redisClient *redis.Client) *WSGateway {
 	return &WSGateway{
 		ctx:            ctx,
 		cancel:         cancel,
-		symbolStreams:  make(map[string]pb.MatchingEngine_SubscribeSymbolClient),
-		symbolUsers:    make(map[string]map[*User]bool),
+		depthStreams:   make(map[string]*redis.PubSub),
+		depthUsers:     make(map[string]map[*User]bool),
+		tickerStreams:  make(map[string]*redis.PubSub),
+		tickerUsers:    make(map[string]map[*User]bool),
 		connectedUsers: make(map[string]*User),
 		redisClient:    redisClient,
 		candleStreams:  make(map[string]*redis.PubSub),
@@ -83,24 +76,6 @@ func (wsg *WSGateway) Shutdown() {
 	wsg.cancel()
 }
 
-// ConnectToEngine dials the matching engine gRPC server.
-func (wsg *WSGateway) ConnectToEngine(uri string) error {
-	conn, err := grpc.NewClient(uri,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                30 * time.Second,
-			Timeout:             10 * time.Second,
-			PermitWithoutStream: true,
-		}),
-	)
-	if err != nil {
-		return fmt.Errorf("connect to engine: %w", err)
-	}
-	wsg.engineConn = conn
-	return nil
-}
-
-// HandleWebSocket upgrades the HTTP connection and starts the user read/write pumps.
 func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := wsg.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -113,14 +88,16 @@ func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := &User{
-		ID:      id,
-		Conn:    conn,
-		send:    make(chan *Event, userChannelBuf),
-		symbols: make(map[string]bool),
-		candles: make(map[string]bool),
+		ID:         id,
+		Conn:       conn,
+		send:       make(chan *Event, userChannelBuf),
+		depthSubs:  make(map[string]bool),
+		tickerSubs: make(map[string]bool),
+		candles:    make(map[string]bool),
 	}
 
 	wsg.registerUser(user)
+	wsg.startOrderStream(user)
 
 	go user.readPump(wsg)
 	go user.writePump()
@@ -134,48 +111,86 @@ func (wsg *WSGateway) registerUser(user *User) {
 }
 
 func (wsg *WSGateway) deregisterUser(user *User) {
-	// unsubscribe from all engine symbol streams
-	for symbol := range user.symbols {
-		wsg.unsubscribeEngineEvents(user, symbol)
-	}
-	// unsubscribe from all candle streams
-	for key := range user.candles {
-		wsg.unsubscribeCandle(user, key)
-	}
-
+	// remove from connectedUsers FIRST so reconnect guards see user as gone
 	wsg.connectedUsersMu.Lock()
 	delete(wsg.connectedUsers, user.ID)
 	wsg.connectedUsersMu.Unlock()
 
+	for symbol := range user.depthSubs {
+		wsg.unsubscribeDepth(user, symbol)
+	}
+	for symbol := range user.tickerSubs {
+		wsg.unsubscribeTicker(user, symbol)
+	}
+	for key := range user.candles {
+		wsg.unsubscribeCandle(user, key)
+	}
+	wsg.stopOrderStream(user)
+
 	slog.Info("user disconnected", "id", user.ID)
 }
 
-// ─── Client message dispatch ──────────────────────────────────────────────────
+type baseMsg struct {
+	Action string `json:"action"`
+}
 
-type UserMessage struct {
-	Action    string `json:"action"`
+type SymbolMsg struct {
+	Symbol string `json:"symbol"`
+}
+
+type CandleMsg struct {
 	Symbol    string `json:"symbol"`
 	Timeframe string `json:"timeframe"`
 }
 
 func (wsg *WSGateway) handleMessage(user *User, raw []byte) {
-	var msg UserMessage
-	if err := json.Unmarshal(raw, &msg); err != nil {
+	var base baseMsg
+	if err := json.Unmarshal(raw, &base); err != nil {
 		return
 	}
 
-	switch msg.Action {
-	case "subscribe_engine_events":
-		if msg.Symbol != "" {
-			wsg.subscribeEngineEvents(user, msg.Symbol)
+	switch base.Action {
+	case "subscribe_depth", "unsubscribe_depth",
+		"subscribe_ticker", "unsubscribe_ticker":
+		var msg SymbolMsg
+		if err := json.Unmarshal(raw, &msg); err != nil || msg.Symbol == "" {
+			return
 		}
-	case "unsubscribe_engine_events":
-		if msg.Symbol != "" {
-			wsg.unsubscribeEngineEvents(user, msg.Symbol)
+		switch base.Action {
+		case "subscribe_depth":
+			wsg.subscribeDepth(user, msg.Symbol)
+		case "unsubscribe_depth":
+			if user.depthSubs[msg.Symbol] {
+				wsg.unsubscribeDepth(user, msg.Symbol)
+			}
+		case "subscribe_ticker":
+			wsg.subscribeTicker(user, msg.Symbol)
+		case "unsubscribe_ticker":
+			if user.tickerSubs[msg.Symbol] {
+				wsg.unsubscribeTicker(user, msg.Symbol)
+			}
 		}
-	case "subscribe_candles":
-		wsg.handleSubscribeCandles(user, msg)
-	case "unsubscribe_candles":
-		wsg.handleUnsubscribeCandles(user, msg)
+
+	case "subscribe_orders":
+		wsg.startOrderStream(user)
+	case "unsubscribe_orders":
+		wsg.stopOrderStream(user)
+
+	case "subscribe_candles", "unsubscribe_candles":
+		var msg CandleMsg
+		if err := json.Unmarshal(raw, &msg); err != nil || msg.Symbol == "" || msg.Timeframe == "" {
+			return
+		}
+		switch base.Action {
+		case "subscribe_candles":
+			if timeframeValid(msg.Timeframe) {
+				wsg.subscribeToCandle(user, msg.Symbol, msg.Timeframe)
+			}
+		case "unsubscribe_candles":
+			key := candleKey(msg.Symbol, msg.Timeframe)
+			if user.candles[key] {
+				wsg.unsubscribeCandle(user, key)
+			}
+		}
 	}
 }

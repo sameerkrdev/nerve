@@ -14,8 +14,19 @@ import (
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
+
 func main() {
 	godotenv.Load()
+
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		if err := internal.InitRedis(redisURL); err != nil {
+			slog.Warn("redis init failed — order/depth events will not be published", "err", err)
+		} else {
+			slog.Info("redis connected")
+		}
+	} else {
+		slog.Warn("REDIS_URL not set — order/depth events will not be published")
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {

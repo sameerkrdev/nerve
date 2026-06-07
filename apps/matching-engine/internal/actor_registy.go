@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-
-	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
 type Symbol struct {
@@ -133,29 +131,3 @@ func ModifyOrder(
 	}
 }
 
-func SubscribeSymbol(symbol string, gatewayId string, stream pb.MatchingEngine_SubscribeSymbolServer) error {
-	actor, ok := actors[symbol]
-	if !ok {
-		return fmt.Errorf("unknown symbol %s", symbol)
-	}
-
-	actor.mu.Lock()
-	actor.grpcStreams = append(actor.grpcStreams, stream)
-	actor.mu.Unlock()
-	slog.Info(fmt.Sprintf("Gateway %s subscribed to %s via dedicated stream", gatewayId, symbol))
-
-	<-stream.Context().Done()
-
-	actor.mu.Lock()
-	for i, s := range actor.grpcStreams {
-		if s == stream {
-			actor.grpcStreams = append(actor.grpcStreams[:i], actor.grpcStreams[i+1:]...)
-			break
-		}
-	}
-	actor.mu.Unlock()
-
-	slog.Info(fmt.Sprintf("Gateway %s unsubscribed to %s", gatewayId, symbol))
-
-	return nil
-}

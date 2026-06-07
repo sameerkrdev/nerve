@@ -6,29 +6,29 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 	pbType "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 	"google.golang.org/protobuf/proto"
 )
 
-// User represents a connected WebSocket client.
 // symbols and candles are only accessed from readPump — no mutex needed.
 type User struct {
 	ID   string
 	Conn *websocket.Conn
 	send chan *Event
 
-	symbols map[string]bool // engine symbol subscriptions
-	candles map[string]bool // candle key subscriptions (candleKey → true)
+	depthSubs  map[string]bool
+	tickerSubs map[string]bool
+	candles    map[string]bool
+	orderSub   *redis.PubSub
 }
 
-// outboundMsg is the JSON envelope written to the WS client.
 type outboundMsg struct {
 	EventType string `json:"eventType"`
 	Data      any    `json:"data"`
 }
 
-// sendProtoJSON unmarshals proto bytes into target then JSON-encodes to WS.
 func (u *User) sendProtoJSON(eventType string, data []byte, target proto.Message) error {
 	if err := proto.Unmarshal(data, target); err != nil {
 		return fmt.Errorf("unmarshal: %w", err)
@@ -36,8 +36,6 @@ func (u *User) sendProtoJSON(eventType string, data []byte, target proto.Message
 	return u.Conn.WriteJSON(&outboundMsg{EventType: eventType, Data: target})
 }
 
-// readPump reads client messages and dispatches actions.
-// One goroutine per user. Owns the WS read path.
 func (u *User) readPump(wsg *WSGateway) {
 	defer func() {
 		wsg.deregisterUser(u)
@@ -59,8 +57,6 @@ func (u *User) readPump(wsg *WSGateway) {
 	}
 }
 
-// writePump drains user.send and writes events to the WS connection.
-// One goroutine per user. Owns the WS write path.
 func (u *User) writePump() {
 	ping := time.NewTicker(wsPingInterval)
 	defer ping.Stop()
@@ -89,11 +85,9 @@ func (u *User) writePump() {
 	}
 }
 
-// dispatch routes a single event to the WS connection.
 func (u *User) dispatch(event *Event) error {
 	switch event.EventType {
 	case EventTypeCandle:
-		// Data is pre-encoded JSON — write directly
 		return u.Conn.WriteMessage(websocket.TextMessage, event.Data)
 
 	case pbType.EventType_ORDER_ACCEPTED,
@@ -118,7 +112,6 @@ func (u *User) dispatch(event *Event) error {
 	return nil
 }
 
-// emit sends an event to the user's channel non-blocking.
 // Drops silently if the buffer is full (live data — missed tick is acceptable).
 func (u *User) emit(event *Event) {
 	select {
