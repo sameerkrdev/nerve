@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package aggeration.v1;
+
+import "aggeration/v1/common.proto";
+
+option go_package = "github.com/sameerkrdev/nerve/packages/proto-defs/proto/aggeration/v1";
+
+message Candle {
+  double o = 1;
+  double h = 2;
+  double l = 3;
+  double c = 4;
+  int64 v = 5;
+
+  bool is_closed = 6;
+  optional int64 close_time = 7; // seconds
+  int64 open_time = 8; // seconds
+}
+
+message CandleBatch {
+  string symbol = 1;
+  Timeframe timeframe = 2;
+  repeated Candle candles = 3;
+}
+
+message GetCandlesRequest {
+  string symbol = 1;
+  // string currency = 2;
+  Timeframe timeframe = 3;
+  oneof method {
+    int64 number_of_candlesticks = 4;
+    DateRange date_range = 5;
+  }
+}
+
+message GetCandlesResponse {
+  oneof result {
+    CandleBatch data = 1;
+    Error error = 2;
+  }
+}
+
+service CandleService {
+  rpc GetCandles(GetCandlesRequest) returns (GetCandlesResponse);
+}

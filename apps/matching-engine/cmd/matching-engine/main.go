@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"log/slog"
 	"net"
@@ -9,20 +8,37 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/joho/godotenv"
 	internal "github.com/sameerkrdev/nerve/apps/matching-engine/internal"
 
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
+
 func main() {
-	port := 50052
+	godotenv.Load()
+
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		if err := internal.InitRedis(redisURL); err != nil {
+			slog.Warn("redis init failed — order/depth events will not be published", "err", err)
+		} else {
+			slog.Info("redis connected")
+		}
+	} else {
+		slog.Warn("REDIS_URL not set — order/depth events will not be published")
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		log.Fatalf("Failed to serve: %v", "PORT is required")
+	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	lis, err := net.Listen("tcp", "localhost:"+port)
 	if err != nil {
-		log.Fatalf("Failed to start grpc server on port %d with error: %v", port, err)
+		log.Fatalf("Failed to start grpc server on port %s with error: %v", port, err)
 	}
 
 	var ops []grpc.ServerOption

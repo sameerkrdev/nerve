@@ -1,16 +1,14 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import type { HttpError } from "http-errors";
 import { logger } from "@repo/logger";
-import tradeRouter from "@/routers/trade.route";
 import userRouter from "@/routers/user.route";
 import orderRouter from "@/routers/order.route";
 
 const app: Express = express();
 app.use(express.json());
 
-app.use("/api/v1/trade", tradeRouter);
-app.use("/api/v1/user", userRouter);
-app.use("/api/v1/order", orderRouter);
+app.use("/api/v1/users", userRouter);
+app.use("/api/v1/orders", orderRouter);
 
 app.get("/", (_, res) => {
   res.json({ message: "Hello World from Nerve trade platform's backend" });

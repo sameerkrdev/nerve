@@ -1,0 +1,24 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/candle-service.exe ./cmd/candle-service"
+bin = "tmp/candle-service.exe"
+
+include_ext = ["go"]
+
+include_dir = [
+  ".",
+  "../../packages/proto-defs/go/generated"
+]
+
+exclude_dir = [
+  "tmp",
+  "vendor",
+  "node_modules"
+]
+
+delay = 200
+
+[log]
+time = true

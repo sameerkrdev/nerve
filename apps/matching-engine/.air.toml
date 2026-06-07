@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/matching-engine ./cmd/matching-engine"
-bin = "tmp/matching-engine"
+cmd = "go build -o ./tmp/matching-engine.exe ./cmd/matching-engine"
+bin = "tmp/matching-engine.exe"
 
 include_ext = ["go"]
 
@@ -19,9 +19,6 @@ exclude_dir = [
 ]
 
 delay = 200
-
-[run]
-cmd = "./tmp/matching-engine"
 
 [log]
 time = true

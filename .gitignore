@@ -47,3 +47,4 @@ packages/proto-defs/go/**
 
 **/tmp/**
 **/bin/**
+.claude

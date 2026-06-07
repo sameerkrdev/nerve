@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>data-service.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<ol>
+<li>Complete System Overview</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">graph TB
+subgraph "External"
+EX[Exchange APIs<br/>Binance, Coinbase]
+end
+
+    subgraph "Data Ingestion Layer"
+        KT[Kafka Topics<br/>trades, candles-1m, candles-5m]
+        EX -->|Trade Events| KT
+    end
+
+    subgraph "Stream Processing Layer"
+        CB[Candle Builder<br/>Stateful Stream]
+        PIC[Popular Indicator Computer<br/>EMA, RSI, MACD]
+        DIC[Dynamic Indicator Computer<br/>User Custom]
+
+        KT -->|trades| CB
+        CB -->|candles-1m| KT
+        KT -->|candles-1m| PIC
+        KT -->|candles-1m| DIC
+    end
+
+    subgraph "Storage Layer"
+        CH[(ClickHouse<br/>OLAP Database)]
+        RD[(Redis<br/>Cache + Pub/Sub)]
+
+        CB -->|Persist Candles| CH
+        PIC -->|Cache Popular| RD
+        DIC -->|Cache Custom| RD
+    end
+
+    subgraph "Data Service"
+        DS[Data Service<br/>gRPC Server]
+
+        DS <-->|Query/Write| CH
+        DS <-->|Cache Get/Set| RD
+    end
+
+    subgraph "WebSocket Gateway Layer"
+        WS1[WebSocket Server 1]
+        WS2[WebSocket Server 2]
+        WS3[WebSocket Server N]
+        LB[Load Balancer]
+
+        LB --> WS1
+        LB --> WS2
+        LB --> WS3
+    end
+
+    subgraph "Clients"
+        C1[Web Browser]
+        C2[Mobile App]
+        C3[Desktop App]
+
+        C1 --> LB
+        C2 --> LB
+        C3 --> LB
+    end
+
+    RD -->|Pub/Sub| WS1
+    RD -->|Pub/Sub| WS2
+    RD -->|Pub/Sub| WS3
+
+    WS1 <-->|gRPC| DS
+    WS2 <-->|gRPC| DS
+    WS3 <-->|gRPC| DS
+
+    PIC -->|Publish Updates| RD
+    DIC -->|Publish Updates| RD
+
+    style KT fill:#ff9999
+    style CH fill:#99ccff
+    style RD fill:#ffcc99
+    style DS fill:#99ff99
+    style LB fill:#cc99ff
+</div></code></pre>
+<hr>
+<ol start="2">
+<li>Real-Time Data Flow (Trade → Client)</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">sequenceDiagram
+    participant Exchange
+    participant Kafka
+    participant CandleBuilder
+    participant Redis
+    participant WebSocket
+    participant Client
+
+    Exchange->>Kafka: Trade Event<br/>{BTCUSDT, price:50000, vol:0.5}
+
+    Kafka->>CandleBuilder: Consume Trade
+
+    Note over CandleBuilder: Update In-Memory<br/>OHLCV Candle
+
+    alt Candle Still Open
+        CandleBuilder->>CandleBuilder: Update High/Low/Close/Volume
+    end
+
+    alt Candle Closed (1 min elapsed)
+        CandleBuilder->>Kafka: Publish Candle<br/>Topic: candles-1m
+        CandleBuilder->>ClickHouse: Persist Candle
+        CandleBuilder->>Redis: Publish Update<br/>Channel: BTCUSDT:1m
+
+        Redis->>WebSocket: Fan Out Update
+
+        WebSocket->>Client: Binary Protobuf Message<br/>MarketDataUpdate
+    end
+
+    Note over Client: Update Chart<br/>in Real-Time
+</div></code></pre>
+<hr>
+<ol start="3">
+<li>Indicator Subscription Flow</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">sequenceDiagram
+    participant Client
+    participant WebSocket
+    participant SubscriptionMgr
+    participant DataService
+    participant Redis
+    participant ClickHouse
+
+    Client->>WebSocket: Subscribe Request<br/>BTCUSDT:1m + RSI(14)
+
+    WebSocket->>SubscriptionMgr: Register Subscription
+
+    SubscriptionMgr->>Redis: Subscribe to Channel<br/>"BTCUSDT:1m:rsi-14"
+
+    WebSocket->>DataService: GetMarketData<br/>(Historical Data)
+
+    DataService->>Redis: Check Cache
+
+    alt Cache Hit
+        Redis-->>DataService: Cached Data
+    else Cache Miss
+        DataService->>ClickHouse: Query Candles
+        ClickHouse-->>DataService: OHLCV Data
+        DataService->>DataService: Compute RSI(14)
+        DataService->>Redis: Cache Result
+    end
+
+    DataService-->>WebSocket: Historical Candles + RSI
+
+    WebSocket->>Client: Send Historical Data<br/>(Replay 100 bars)
+
+    WebSocket->>Client: Subscription Confirmed
+
+    Note over Client,Redis: Real-time updates begin
+
+    loop Every New Candle
+        Redis->>WebSocket: Update via Pub/Sub
+        WebSocket->>Client: MarketDataUpdate
+    end
+
+</div></code></pre>
+<hr>
+<ol start="4">
+<li>WebSocket Server Internal Architecture</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">graph TB
+    subgraph "WebSocket Server Process"
+        HTTP[HTTP Handler<br/>:8080/v1/stream]
+
+        subgraph "Connection Management"
+            UP[Upgrader<br/>HTTP → WebSocket]
+            CP[Client Pool<br/>sync.Map]
+        end
+
+        subgraph "Client Goroutines"
+            direction LR
+            C1[Client 1]
+            C2[Client 2]
+            CN[Client N]
+
+            subgraph "Per Client"
+                RP[Read Pump<br/>Goroutine]
+                WP[Write Pump<br/>Goroutine]
+                SC[Send Channel<br/>buffered 256]
+            end
+        end
+
+        subgraph "Subscription Management"
+            SM[Subscription Manager]
+            SB[Subscriptions Map<br/>symbol:tf → []clients]
+        end
+
+        subgraph "External Communication"
+            GRPC[gRPC Client<br/>→ Data Service]
+            RPUB[Redis Pub/Sub<br/>Receiver]
+        end
+
+        HTTP --> UP
+        UP --> CP
+        CP --> C1
+        CP --> C2
+        CP --> CN
+
+        C1 --> RP
+        C1 --> WP
+        RP --> SC
+        SC --> WP
+
+        RP -->|Subscribe Request| SM
+        SM --> SB
+        SM -->|Subscribe Channel| RPUB
+
+        RP -->|Get Data Request| GRPC
+        GRPC -->|Response| SC
+
+        RPUB -->|Update| SM
+        SM -->|Fan Out| SC
+    end
+
+    EXT_DS[Data Service<br/>gRPC Server]
+    EXT_RD[Redis<br/>Pub/Sub]
+
+    GRPC <-->|gRPC| EXT_DS
+    RPUB <-->|Pub/Sub| EXT_RD
+
+    style HTTP fill:#ffcccc
+    style CP fill:#ccffcc
+    style SM fill:#ccccff
+    style GRPC fill:#ffffcc
+    style RPUB fill:#ffccff
+</div></code></pre>
+<hr>
+<ol start="6">
+<li>Data Service Request Flow</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">graph LR
+    subgraph "WebSocket Server"
+        WS[Client Connection]
+    end
+
+    subgraph "Data Service"
+        GRPC[gRPC Handler]
+
+        subgraph "Cache Layer"
+            RC[Redis Cache]
+            CHK{Cache Hit?}
+        end
+
+        subgraph "Computation Layer"
+            IC[Indicator Computer]
+
+            subgraph "Indicator Types"
+                PRSI[RSI Calculator]
+                PMACD[MACD Calculator]
+                PBB[Bollinger Calculator]
+                PCUST[Pine Script Engine]
+            end
+        end
+
+        subgraph "Storage Layer"
+            CH[(ClickHouse)]
+        end
+    end
+
+    WS -->|GetMarketData<br/>BTCUSDT:1m<br/>RSI(14)| GRPC
+
+    GRPC --> CHK
+
+    CHK -->|Hit| RC
+    RC -->|Cached Data| GRPC
+
+    CHK -->|Miss| CH
+    CH -->|OHLCV Candles| IC
+
+    IC --> PRSI
+    PRSI -->|RSI Values| IC
+
+    IC -->|Cache Write| RC
+    IC -->|Result| GRPC
+
+    GRPC -->|Response| WS
+
+    style CHK fill:#ffff99
+    style RC fill:#99ff99
+    style IC fill:#ff99ff
+    style CH fill:#9999ff
+</div></code></pre>
+<hr>
+<ol start="7">
+<li>Subscription Manager Architecture</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">graph TB
+    subgraph "Subscription Manager"
+        SM[Manager Instance]
+
+        subgraph "Subscription Storage"
+            SMAP["subscriptions map<br/>key: 'BTCUSDT:1m'<br/>value: []*Subscription"]
+        end
+
+        subgraph "Redis Integration"
+            direction LR
+            RSB[Redis Subscribe]
+            RUS[Redis Unsubscribe]
+            RHD[Redis Handler]
+        end
+
+        subgraph "Fan-Out Engine"
+            FO[Fan Out to Clients]
+
+            subgraph "Client Channels"
+                CH1[Client 1 Send Chan]
+                CH2[Client 2 Send Chan]
+                CHN[Client N Send Chan]
+            end
+        end
+
+        subgraph "Lifecycle Management"
+            GC[Garbage Collector<br/>Every 1 min]
+            INACT[Remove Inactive<br/>>5 min idle]
+        end
+    end
+
+    CLI1[Client 1<br/>Subscribe]
+    CLI2[Client 2<br/>Subscribe]
+    CLI3[Client 3<br/>Unsubscribe]
+
+    RD[(Redis Pub/Sub)]
+
+    CLI1 -->|Subscribe| SM
+    CLI2 -->|Subscribe| SM
+    CLI3 -->|Unsubscribe| SM
+
+    SM --> SMAP
+
+    SM -->|First Subscriber| RSB
+    RSB -->|Subscribe| RD
+
+    SM -->|Last Subscriber| RUS
+    RUS -->|Unsubscribe| RD
+
+    RD -->|Update Message| RHD
+    RHD --> FO
+
+    FO --> CH1
+    FO --> CH2
+    FO --> CHN
+
+    GC -->|Check Activity| SMAP
+    INACT -->|Cleanup| SMAP
+
+    style SMAP fill:#ffcccc
+    style RHD fill:#ccffcc
+    style FO fill:#ccccff
+    style GC fill:#ffffcc
+</div></code></pre>
+<hr>
+<ol start="8">
+<li>Stream Processor State Management</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">graph TB
+    subgraph "Stream Processor"
+        KCS[Kafka Consumer]
+
+        subgraph "Per-Symbol State"
+            direction TB
+
+            STATE["State Store<br/>(RocksDB/Flink)"]
+
+            subgraph "Symbol: BTCUSDT"
+                S1["Current Candle<br/>{open, high, low, close, vol}"]
+
+                subgraph "Indicator States"
+                    I1["RSI(14)<br/>{avg_gain, avg_loss, prices[14]}"]
+                    I2["MACD(12,26,9)<br/>{ema12, ema26, signal}"]
+                    I3["BB(20,2)<br/>{sma, std_dev}"]
+                end
+            end
+
+            subgraph "Symbol: ETHUSDT"
+                S2["Current Candle"]
+                I4["RSI(14)"]
+            end
+        end
+
+        subgraph "Output"
+            KP[Kafka Producer]
+            RDP[Redis Publisher]
+            CHW[ClickHouse Writer]
+        end
+
+        subgraph "Checkpointing"
+            CP[Checkpoint<br/>Every 60s]
+            SNAP[State Snapshot]
+        end
+    end
+
+    KAFKA[(Kafka<br/>trades topic)]
+    REDIS[(Redis)]
+    CH[(ClickHouse)]
+
+    KAFKA -->|Trade Events| KCS
+
+    KCS -->|Update State| STATE
+
+    STATE --> S1
+    S1 --> I1
+    S1 --> I2
+    S1 --> I3
+
+    STATE --> S2
+    S2 --> I4
+
+    S1 -->|Candle Closed| KP
+    I1 -->|New Value| RDP
+    I2 -->|New Value| RDP
+
+    KP -->|candles-1m| KAFKA
+    RDP -->|Pub/Sub| REDIS
+    S1 -->|Persist| CHW
+    CHW --> CH
+
+    STATE -->|Periodic| CP
+    CP --> SNAP
+    SNAP -.->|Recovery| STATE
+
+    style STATE fill:#ffcccc
+    style S1 fill:#ccffcc
+    style I1 fill:#ccccff
+    style CP fill:#ffffcc
+</div></code></pre>
+<ol start="9">
+<li>Horizontal Scaling Architecture</li>
+</ol>
+<pre><code class="language-mermaid"><div class="mermaid">graph TB
+    subgraph "Load Balancers"
+        LB1[Load Balancer<br/>WebSocket]
+        LB2[Load Balancer<br/>gRPC]
+    end
+
+    subgraph "WebSocket Tier - Stateless"
+        WS1[WS Server 1<br/>40K connections]
+        WS2[WS Server 2<br/>40K connections]
+        WS3[WS Server 3<br/>20K connections]
+    end
+
+    subgraph "Data Service Tier - Stateless"
+        DS1[Data Service 1]
+        DS2[Data Service 2]
+        DS3[Data Service 3]
+    end
+
+    subgraph "Stream Processing Tier - Stateful"
+        direction LR
+
+        subgraph "Candle Builders"
+            CB1[Builder 1<br/>Partition 0-5]
+            CB2[Builder 2<br/>Partition 6-11]
+            CB3[Builder 3<br/>Partition 12-15]
+        end
+
+        subgraph "Indicator Computers"
+            IC1[Computer 1<br/>Partition 0-5]
+            IC2[Computer 2<br/>Partition 6-11]
+            IC3[Computer 3<br/>Partition 12-15]
+        end
+    end
+
+    subgraph "Shared State"
+        KAFKA[(Kafka<br/>16 Partitions)]
+        REDIS[(Redis Cluster<br/>3 Master + 3 Replica)]
+        CH[(ClickHouse<br/>Distributed)]
+    end
+
+    CLIENTS[100K Clients]
+
+    CLIENTS --> LB1
+
+    LB1 --> WS1
+    LB1 --> WS2
+    LB1 --> WS3
+
+    WS1 --> LB2
+    WS2 --> LB2
+    WS3 --> LB2
+
+    LB2 --> DS1
+    LB2 --> DS2
+    LB2 --> DS3
+
+    DS1 --> REDIS
+    DS1 --> CH
+    DS2 --> REDIS
+    DS2 --> CH
+    DS3 --> REDIS
+    DS3 --> CH
+
+    KAFKA --> CB1
+    KAFKA --> CB2
+    KAFKA --> CB3
+
+    KAFKA --> IC1
+    KAFKA --> IC2
+    KAFKA --> IC3
+
+    CB1 --> KAFKA
+    CB2 --> KAFKA
+    CB3 --> KAFKA
+
+    CB1 --> REDIS
+    CB2 --> REDIS
+    CB3 --> REDIS
+
+    IC1 --> REDIS
+    IC2 --> REDIS
+    IC3 --> REDIS
+
+    WS1 -.->|Pub/Sub| REDIS
+    WS2 -.->|Pub/Sub| REDIS
+    WS3 -.->|Pub/Sub| REDIS
+
+    style LB1 fill:#ff9999
+    style WS1 fill:#99ccff
+    style DS1 fill:#99ff99
+    style CB1 fill:#ffcc99
+    style IC1 fill:#cc99ff
+    style KAFKA fill:#ffcccc
+    style REDIS fill:#ccffff
+</div></code></pre>
+
+</body>
+</html>

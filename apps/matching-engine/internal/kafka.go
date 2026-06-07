@@ -48,7 +48,11 @@ type KafkaProducerWorker struct {
 }
 
 func NewKafkaProducerWorker(symbol string, dirPath string, wal *SymbolWAL, batchSize int, emitTime int) (*KafkaProducerWorker, error) {
-	brokers := []string{"localhost:19092", "localhost:19093", "localhost:19094"}
+	brokersEnv := os.Getenv("KAFKA_BROKERS")
+	if brokersEnv == "" {
+		brokersEnv = "localhost:19092,localhost:19093,localhost:19094"
+	}
+	brokers := strings.Split(brokersEnv, ",")
 	producer, err := GetProducer(brokers)
 	if err != nil {
 		return nil, err

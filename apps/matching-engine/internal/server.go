@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	// "log/slog"
-
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -113,13 +111,3 @@ func (s *Server) ModifyOrder(ctx context.Context, req *pb.ModifyOrderRequest) (*
 	}, nil
 }
 
-func (s *Server) SubscribeSymbol(req *pb.SubscribeRequest, stream pb.MatchingEngine_SubscribeSymbolServer) error {
-	symbol := req.Symbol
-	gatewayId := req.GatewayId
-
-	if err := SubscribeSymbol(symbol, gatewayId, stream); err != nil {
-		return err
-	}
-
-	return nil
-}

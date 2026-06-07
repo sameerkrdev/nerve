@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	pbTypes "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
@@ -876,9 +875,6 @@ type SymbolActor struct {
 
 	wal          *SymbolWAL
 	kafkaEmitter *KafkaProducerWorker
-	grpcStreams  []pb.MatchingEngine_SubscribeSymbolServer
-
-	mu sync.RWMutex
 }
 
 func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
@@ -904,7 +900,6 @@ func NewSymbolActor(symbol Symbol, buffer int) (*SymbolActor, error) {
 		engine:       NewMatchingEngine(symbol.Name, wal),
 		wal:          wal,
 		kafkaEmitter: kakfaWoker,
-		grpcStreams:  make([]pb.MatchingEngine_SubscribeSymbolServer, 0),
 	}, nil
 }
 
@@ -931,19 +926,14 @@ func (a *SymbolActor) Run() {
 			// events = append(events, depthEvent)
 
 			for _, event := range events {
+				event.Symbol = a.symbol
 				data, err := proto.Marshal(event)
 				if err != nil {
 					m.Err <- err
 					continue
 				}
 
-				a.mu.RLock()
-				streams := make([]pb.MatchingEngine_SubscribeSymbolServer, len(a.grpcStreams))
-				copy(streams, a.grpcStreams)
-				a.mu.RUnlock()
-				for _, stream := range streams {
-					stream.Send(event)
-				}
+				go PublishEngineEvent(event)
 
 				if event.EventType == pbTypes.EventType_DEPTH || event.EventType == pbTypes.EventType_TICKER {
 					continue
@@ -966,19 +956,14 @@ func (a *SymbolActor) Run() {
 			}
 
 			for _, event := range events {
+				event.Symbol = a.symbol
 				data, err := proto.Marshal(event)
 				if err != nil {
 					m.Err <- err
 					continue
 				}
 
-				a.mu.RLock()
-				streams := make([]pb.MatchingEngine_SubscribeSymbolServer, len(a.grpcStreams))
-				copy(streams, a.grpcStreams)
-				a.mu.RUnlock()
-				for _, stream := range streams {
-					stream.Send(event)
-				}
+				go PublishEngineEvent(event)
 
 				if event.EventType == pbTypes.EventType_DEPTH || event.EventType == pbTypes.EventType_TICKER {
 					continue
@@ -1001,19 +986,14 @@ func (a *SymbolActor) Run() {
 			}
 
 			for _, event := range events {
+				event.Symbol = a.symbol
 				data, err := proto.Marshal(event)
 				if err != nil {
 					m.Err <- err
 					continue
 				}
 
-				a.mu.RLock()
-				streams := make([]pb.MatchingEngine_SubscribeSymbolServer, len(a.grpcStreams))
-				copy(streams, a.grpcStreams)
-				a.mu.RUnlock()
-				for _, stream := range streams {
-					stream.Send(event)
-				}
+				go PublishEngineEvent(event)
 
 				if event.EventType == pbTypes.EventType_DEPTH || event.EventType == pbTypes.EventType_TICKER {
 					continue
