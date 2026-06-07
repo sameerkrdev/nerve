@@ -71,6 +71,10 @@ func (cache *CandleStore) AddNewCandle(
 	timestamp := tradeData.Timestamp
 
 	for tfName, tfSeconds := range pb.Timeframe_value {
+		if tfSeconds <= 0 {
+			continue
+		}
+
 		activeCandle, exists := store.current[tfName]
 
 		openTimeBucket := (timestamp.Seconds / int64(tfSeconds)) * int64(tfSeconds)
@@ -101,7 +105,7 @@ func (cache *CandleStore) AddNewCandle(
 }
 
 func (cache *CandleStore) updateCandle(candle *pb.Candle, trade *matchingEnigne.TradeEvent) {
-	price := float64(trade.Price / 100)
+	price := float64(trade.Price / 100.0)
 
 	if candle.H < price {
 		candle.H = price
@@ -117,10 +121,10 @@ func (cache *CandleStore) updateCandle(candle *pb.Candle, trade *matchingEnigne.
 
 func (cache *CandleStore) newCandle(trade *matchingEnigne.TradeEvent, _ string, _ int32, openTimeBucket int64) *pb.Candle {
 	candle := &pb.Candle{
-		O:        float64(trade.Price / 100),
-		H:        float64(trade.Price / 100),
-		L:        float64(trade.Price / 100),
-		C:        float64(trade.Price / 100),
+		O:        float64(trade.Price / 100.0),
+		H:        float64(trade.Price / 100.0),
+		L:        float64(trade.Price / 100.0),
+		C:        float64(trade.Price / 100.0),
 		V:        trade.Quantity,
 		OpenTime: openTimeBucket,
 	}

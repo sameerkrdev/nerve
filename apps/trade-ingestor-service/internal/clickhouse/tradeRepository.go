@@ -38,7 +38,7 @@ func EnsureSchema(ctx context.Context, conn driver.Conn) error {
 		`CREATE TABLE IF NOT EXISTS candles_state (
 			symbol         LowCardinality(String),
 			timeframe_secs UInt32,
-			candle_time    DateTime,
+			candle_time    DateTime('UTC'),
 			open_state     AggregateFunction(argMin, Float64, DateTime64(9)),
 			high_state     AggregateFunction(max, Float64),
 			low_state      AggregateFunction(min, Float64),
@@ -91,7 +91,7 @@ func candleMV(name string, tfSecs int) string {
 		SELECT
 			symbol,
 			%d AS timeframe_secs,
-			toDateTime(intDiv(toUnixTimestamp64Second(timestamp), %d) * %d) AS candle_time,
+			toDateTime(intDiv(toUnixTimestamp64Second(timestamp), %d) * %d, 'UTC') AS candle_time,
 			argMinState(price, timestamp) AS open_state,
 			maxState(price)               AS high_state,
 			minState(price)               AS low_state,

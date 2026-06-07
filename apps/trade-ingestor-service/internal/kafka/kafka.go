@@ -25,6 +25,7 @@ func InitKafkaConsumerClient(brokers []string) (*sarama.ConsumerGroup, error) {
 		config.Consumer.Offsets.AutoCommit.Enable = true
 		config.Consumer.Offsets.AutoCommit.Interval = 2 * time.Second
 		config.Consumer.MaxWaitTime = 500 * time.Millisecond
+		config.Consumer.Return.Errors = true
 
 		conn, err := sarama.NewConsumerGroup(brokers, "trade-ingestor-service", config)
 

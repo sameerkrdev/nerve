@@ -45,7 +45,7 @@ type WSGateway struct {
 	connectedUsersMu sync.RWMutex
 
 	redisClient     *redis.Client
-	candleStreams    map[string]*redis.PubSub
+	candleStreams   map[string]*redis.PubSub
 	candleStreamsMu sync.RWMutex
 	candleUsers     map[string]map[*User]bool
 	candleUsersMu   sync.RWMutex
@@ -97,10 +97,12 @@ func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wsg.registerUser(user)
+
+	go user.writePump()
+	go user.readPump(wsg)
+
 	wsg.startOrderStream(user)
 
-	go user.readPump(wsg)
-	go user.writePump()
 }
 
 func (wsg *WSGateway) registerUser(user *User) {
