@@ -14,7 +14,6 @@ import (
 	pb "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/engine"
 )
 
-
 func main() {
 	godotenv.Load()
 
@@ -36,7 +35,7 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	lis, err := net.Listen("tcp", "localhost:"+port)
+	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatalf("Failed to start grpc server on port %s with error: %v", port, err)
 	}

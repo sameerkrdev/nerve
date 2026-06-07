@@ -39,7 +39,7 @@ SETTINGS index_granularity = 8192;
 CREATE TABLE IF NOT EXISTS nerve.candles_state (
     symbol         LowCardinality(String),
     timeframe_secs UInt32,
-    candle_time    DateTime,
+    candle_time    DateTime('UTC'),
     open_state     AggregateFunction(argMin, Float64, DateTime64(9)),
     high_state     AggregateFunction(max, Float64),
     low_state      AggregateFunction(min, Float64),
@@ -60,7 +60,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     60 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 60) * 60) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 60) * 60, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -74,7 +74,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     180 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 180) * 180) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 180) * 180, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -88,7 +88,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     300 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 300) * 300) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 300) * 300, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -102,7 +102,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     900 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 900) * 900) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 900) * 900, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -116,7 +116,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     1800 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 1800) * 1800) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 1800) * 1800, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -130,7 +130,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     3600 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 3600) * 3600) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 3600) * 3600, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -144,7 +144,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     7200 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 7200) * 7200) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 7200) * 7200, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -158,7 +158,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     14400 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 14400) * 14400) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 14400) * 14400, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -172,7 +172,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     21600 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 21600) * 21600) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 21600) * 21600, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -186,7 +186,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     43200 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 43200) * 43200) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 43200) * 43200, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -200,7 +200,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     86400 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 86400) * 86400) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 86400) * 86400, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -214,7 +214,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     604800 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 604800) * 604800) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 604800) * 604800, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,
@@ -228,7 +228,7 @@ TO nerve.candles_state AS
 SELECT
     symbol,
     2592000 AS timeframe_secs,
-    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 2592000) * 2592000) AS candle_time,
+    toDateTime(intDiv(toUnixTimestamp64Second(timestamp), 2592000) * 2592000, 'UTC') AS candle_time,
     argMinState(price, timestamp) AS open_state,
     maxState(price)               AS high_state,
     minState(price)               AS low_state,

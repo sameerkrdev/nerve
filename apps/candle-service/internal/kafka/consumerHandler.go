@@ -34,7 +34,11 @@ func (ch *ConsumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, cla
 	for msg := range claim.Messages() {
 
 		event := &pb.EngineEvent{}
-		proto.Unmarshal(msg.Value, event)
+		if err := proto.Unmarshal(msg.Value, event); err != nil {
+			log.Println("failed to unmarshal engine event", "error", err)
+			session.MarkMessage(msg, "") // TODO: maybe retry
+			continue
+		}
 
 		if event.EventType == common.EventType_TRADE_EXECUTED {
 			ch.router.Route(event)

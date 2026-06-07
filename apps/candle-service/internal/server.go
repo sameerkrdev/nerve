@@ -19,8 +19,8 @@ import (
 )
 
 type Server struct {
-	router          *engine.WorkerRouter
-	clickhouseConn  driver.Conn
+	router         *engine.WorkerRouter
+	clickhouseConn driver.Conn
 	pbAggeration.UnimplementedCandleServiceServer
 }
 
@@ -55,8 +55,14 @@ func (s *Server) GetCandles(ctx context.Context, req *pbAggeration.GetCandlesReq
 	}
 
 	count := req.GetNumberOfCandlesticks()
+
+	defaultCandles := int64(500)
+	maxCandles := int64(5000)
+
 	if count <= 0 {
-		count = 500
+		count = defaultCandles
+	} else if count > maxCandles {
+		count = maxCandles
 	}
 
 	tfName, ok := pbAggeration.Timeframe_name[int32(tf)]

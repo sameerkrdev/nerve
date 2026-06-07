@@ -13,6 +13,10 @@ type WorkerRouter struct {
 }
 
 func NewWorkerRouter(workerCount int, onCandleClosed memorystore.OnCandleClosedFn) *WorkerRouter {
+	if workerCount <= 0 {
+		panic("workerCount must be > 0")
+	}
+
 	var workers []*Worker
 
 	for i := range workerCount {
