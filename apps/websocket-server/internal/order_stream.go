@@ -13,7 +13,7 @@ func (wsg *WSGateway) startOrderStream(user *User) {
 	if user.orderSub != nil {
 		return
 	}
-	pubsub := wsg.redisClient.Subscribe(wsg.ctx, orderKey(user.ID))
+	pubsub := wsg.redis.Subscribe(wsg.ctx, orderKey(user.ID))
 	user.orderSub = pubsub
 	slog.Info("started order stream", "user", user.ID)
 	go wsg.receiveOrderEvents(user, pubsub)

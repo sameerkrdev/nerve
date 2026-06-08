@@ -1,26 +1,44 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	pbAgg "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/aggeration/v1"
 	pbType "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
+	"google.golang.org/protobuf/proto"
 )
 
-// EventTypeCandle is a synthetic sentinel — not in the proto EventType enum.
-// Used to route candle events through the existing user.Channel without proto changes.
+// Synthetic EventType sentinels — not in the proto EventType enum.
 const EventTypeCandle = pbType.EventType(99)
+const EventTypeError = pbType.EventType(98)
 
-// Pre-encoded once at fan-out time, sent as-is to all N subscribers (zero per-user work).
 type CandleWSPayload struct {
-	EventType string       `json:"eventType"`
-	Symbol    string       `json:"symbol"`
-	Timeframe string       `json:"timeframe"`
+	EventType string        `json:"eventType"`
+	Symbol    string        `json:"symbol"`
+	Timeframe string        `json:"timeframe"`
 	Data      *pbAgg.Candle `json:"data"`
 }
 
-// Must match the format used by candle-service/internal/memoryStore/redis.go.
+func makeCandleEvent(key string, data []byte) (*Event, error) {
+	symbol, timeframe := parseKeyParts(key)
+	candle := &pbAgg.Candle{}
+	if err := proto.Unmarshal(data, candle); err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(&CandleWSPayload{
+		EventType: "candle",
+		Symbol:    symbol,
+		Timeframe: strings.ToUpper(timeframe),
+		Data:      candle,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Event{EventType: EventTypeCandle, Data: payload}, nil
+}
+
 func candleKey(symbol, timeframe string) string {
 	return fmt.Sprintf("candles:%s:%s", strings.ToUpper(symbol), strings.ToLower(timeframe))
 }

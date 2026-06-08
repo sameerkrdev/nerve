@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -38,47 +39,42 @@ type WSGateway struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	jwtPublicKey *rsa.PublicKey
+	upgrader     websocket.Upgrader
+	redis        *redis.Client
 
-	depthStreams   map[string]*redis.PubSub
-	depthStreamsMu sync.RWMutex
-	depthUsers     map[string]map[*User]bool
-	depthUsersMu   sync.RWMutex
+	depth  *fanoutStream
+	ticker *fanoutStream
+	candle *fanoutStream
 
-	tickerStreams   map[string]*redis.PubSub
-	tickerStreamsMu sync.RWMutex
-	tickerUsers     map[string]map[*User]bool
-	tickerUsersMu   sync.RWMutex
-
-	connectedUsers   map[string]*User
 	connectedUsersMu sync.RWMutex
-
-	redisClient     *redis.Client
-	candleStreams   map[string]*redis.PubSub
-	candleStreamsMu sync.RWMutex
-	candleUsers     map[string]map[*User]bool
-	candleUsersMu   sync.RWMutex
-
-	upgrader websocket.Upgrader
+	connectedUsers   map[string]*User
 }
 
 func NewWSGateway(redisClient *redis.Client, jwtPublicKey *rsa.PublicKey) *WSGateway {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &WSGateway{
+
+	wsg := &WSGateway{
 		ctx:            ctx,
 		cancel:         cancel,
 		jwtPublicKey:   jwtPublicKey,
-		depthStreams:   make(map[string]*redis.PubSub),
-		depthUsers:     make(map[string]map[*User]bool),
-		tickerStreams:  make(map[string]*redis.PubSub),
-		tickerUsers:    make(map[string]map[*User]bool),
+		redis:          redisClient,
 		connectedUsers: make(map[string]*User),
-		redisClient:    redisClient,
-		candleStreams:  make(map[string]*redis.PubSub),
-		candleUsers:    make(map[string]map[*User]bool),
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
-		},
+		upgrader:       websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
 	}
+
+	wsg.depth = newFanoutStream(ctx, redisClient, "depth", depthKey,
+		func(_ string, data []byte) (*Event, error) {
+			return &Event{EventType: pbType.EventType_DEPTH, Data: data}, nil
+		})
+	wsg.ticker = newFanoutStream(ctx, redisClient, "ticker", tickerKey,
+		func(_ string, data []byte) (*Event, error) {
+			return &Event{EventType: pbType.EventType_TICKER, Data: data}, nil
+		})
+	wsg.candle = newFanoutStream(ctx, redisClient, "candle",
+		func(key string) string { return key },
+		makeCandleEvent)
+
+	return wsg
 }
 
 func (wsg *WSGateway) Shutdown() {
@@ -86,33 +82,33 @@ func (wsg *WSGateway) Shutdown() {
 }
 
 func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	tokenStr := r.URL.Query().Get("token")
-	if tokenStr == "" {
-		http.Error(w, "missing token", http.StatusUnauthorized)
-		return
-	}
+	var userID string
+	isAuthenticated := false
 
-	claims := &wsClaims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, jwt.ErrSignatureInvalid
-		}
-		return wsg.jwtPublicKey, nil
-	}, jwt.WithLeeway(30*time.Second))
-	if err != nil || !token.Valid {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	if claims.JTI != "" {
-		n, err := wsg.redisClient.Exists(r.Context(), "bl:"+claims.JTI).Result()
-		if err == nil && n > 0 {
-			http.Error(w, "token revoked", http.StatusUnauthorized)
+	if tokenStr := r.URL.Query().Get("token"); tokenStr != "" {
+		claims := &wsClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return wsg.jwtPublicKey, nil
+		}, jwt.WithLeeway(30*time.Second))
+		if err != nil || !token.Valid {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
+		if claims.JTI != "" {
+			n, err := wsg.redis.Exists(r.Context(), "bl:"+claims.JTI).Result()
+			if err == nil && n > 0 {
+				http.Error(w, "token revoked", http.StatusUnauthorized)
+				return
+			}
+		}
+		userID = claims.Subject
+		isAuthenticated = true
+	} else {
+		userID = fmt.Sprintf("anon-%d", time.Now().UnixNano())
 	}
-
-	userID := claims.Subject
 
 	conn, err := wsg.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -120,20 +116,19 @@ func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := &User{
-		ID:         userID,
-		Conn:       conn,
-		send:       make(chan *Event, userChannelBuf),
-		depthSubs:  make(map[string]bool),
-		tickerSubs: make(map[string]bool),
-		candles:    make(map[string]bool),
+		ID:              userID,
+		Conn:            conn,
+		send:            make(chan *Event, userChannelBuf),
+		isAuthenticated: isAuthenticated,
 	}
 
 	wsg.registerUser(user)
-
 	go user.writePump()
 	go user.readPump(wsg)
 
-	wsg.startOrderStream(user)
+	if isAuthenticated {
+		wsg.startOrderStream(user)
+	}
 }
 
 func (wsg *WSGateway) registerUser(user *User) {
@@ -144,34 +139,33 @@ func (wsg *WSGateway) registerUser(user *User) {
 }
 
 func (wsg *WSGateway) deregisterUser(user *User) {
-	// remove from connectedUsers FIRST so reconnect guards see user as gone
 	wsg.connectedUsersMu.Lock()
 	delete(wsg.connectedUsers, user.ID)
 	wsg.connectedUsersMu.Unlock()
 
-	for symbol := range user.depthSubs {
-		wsg.unsubscribeDepth(user, symbol)
-	}
-	for symbol := range user.tickerSubs {
-		wsg.unsubscribeTicker(user, symbol)
-	}
-	for key := range user.candles {
-		wsg.unsubscribeCandle(user, key)
-	}
+	wsg.depth.removeUser(user)
+	wsg.ticker.removeUser(user)
+	wsg.candle.removeUser(user)
 	wsg.stopOrderStream(user)
 
 	slog.Info("user disconnected", "id", user.ID)
+}
+
+// authRequiredActions lists WS actions that require an authenticated connection.
+var authRequiredActions = map[string]bool{
+	"subscribe_orders":   true,
+	"unsubscribe_orders": true,
 }
 
 type baseMsg struct {
 	Action string `json:"action"`
 }
 
-type SymbolMsg struct {
+type symbolMsg struct {
 	Symbol string `json:"symbol"`
 }
 
-type CandleMsg struct {
+type candleMsg struct {
 	Symbol    string `json:"symbol"`
 	Timeframe string `json:"timeframe"`
 }
@@ -182,26 +176,28 @@ func (wsg *WSGateway) handleMessage(user *User, raw []byte) {
 		return
 	}
 
+	if authRequiredActions[base.Action] && !user.isAuthenticated {
+		data, _ := json.Marshal(&errorPayload{EventType: "ERROR", Error: "authentication required"})
+		user.emit(&Event{EventType: EventTypeError, Data: data})
+		return
+	}
+
 	switch base.Action {
 	case "subscribe_depth", "unsubscribe_depth",
 		"subscribe_ticker", "unsubscribe_ticker":
-		var msg SymbolMsg
+		var msg symbolMsg
 		if err := json.Unmarshal(raw, &msg); err != nil || msg.Symbol == "" {
 			return
 		}
 		switch base.Action {
 		case "subscribe_depth":
-			wsg.subscribeDepth(user, msg.Symbol)
+			wsg.depth.subscribe(user, msg.Symbol)
 		case "unsubscribe_depth":
-			if user.depthSubs[msg.Symbol] {
-				wsg.unsubscribeDepth(user, msg.Symbol)
-			}
+			wsg.depth.unsubscribe(user, msg.Symbol)
 		case "subscribe_ticker":
-			wsg.subscribeTicker(user, msg.Symbol)
+			wsg.ticker.subscribe(user, msg.Symbol)
 		case "unsubscribe_ticker":
-			if user.tickerSubs[msg.Symbol] {
-				wsg.unsubscribeTicker(user, msg.Symbol)
-			}
+			wsg.ticker.unsubscribe(user, msg.Symbol)
 		}
 
 	case "subscribe_orders":
@@ -210,20 +206,17 @@ func (wsg *WSGateway) handleMessage(user *User, raw []byte) {
 		wsg.stopOrderStream(user)
 
 	case "subscribe_candles", "unsubscribe_candles":
-		var msg CandleMsg
+		var msg candleMsg
 		if err := json.Unmarshal(raw, &msg); err != nil || msg.Symbol == "" || msg.Timeframe == "" {
 			return
 		}
 		switch base.Action {
 		case "subscribe_candles":
 			if timeframeValid(msg.Timeframe) {
-				wsg.subscribeToCandle(user, msg.Symbol, msg.Timeframe)
+				wsg.candle.subscribe(user, candleKey(msg.Symbol, msg.Timeframe))
 			}
 		case "unsubscribe_candles":
-			key := candleKey(msg.Symbol, msg.Timeframe)
-			if user.candles[key] {
-				wsg.unsubscribeCandle(user, key)
-			}
+			wsg.candle.unsubscribe(user, candleKey(msg.Symbol, msg.Timeframe))
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -12,21 +13,22 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// symbols and candles are only accessed from readPump — no mutex needed.
 type User struct {
-	ID   string
-	Conn *websocket.Conn
-	send chan *Event
-
-	depthSubs  map[string]bool
-	tickerSubs map[string]bool
-	candles    map[string]bool
-	orderSub   *redis.PubSub
+	ID              string
+	Conn            *websocket.Conn
+	send            chan *Event
+	isAuthenticated bool
+	orderSub        *redis.PubSub
 }
 
 type outboundMsg struct {
 	EventType string `json:"eventType"`
 	Data      any    `json:"data"`
+}
+
+type errorPayload struct {
+	EventType string `json:"eventType"`
+	Error     string `json:"error"`
 }
 
 func (u *User) sendProtoJSON(eventType string, data []byte, target proto.Message) error {
@@ -65,12 +67,10 @@ func (u *User) writePump() {
 		select {
 		case event, ok := <-u.send:
 			u.Conn.SetWriteDeadline(time.Now().Add(wsWriteDeadline))
-
 			if !ok {
 				u.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
 			if err := u.dispatch(event); err != nil {
 				slog.Warn("write failed, closing", "user", u.ID, "err", err)
 				return
@@ -87,6 +87,13 @@ func (u *User) writePump() {
 
 func (u *User) dispatch(event *Event) error {
 	switch event.EventType {
+	case EventTypeError:
+		var p errorPayload
+		if err := json.Unmarshal(event.Data, &p); err != nil {
+			return err
+		}
+		return u.Conn.WriteJSON(&p)
+
 	case EventTypeCandle:
 		return u.Conn.WriteMessage(websocket.TextMessage, event.Data)
 
