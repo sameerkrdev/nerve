@@ -3,12 +3,16 @@ import type { HttpError } from "http-errors";
 import { logger } from "@repo/logger";
 import userRouter from "@/routers/user.route";
 import orderRouter from "@/routers/order.route";
+import authRouter from "@/routers/auth.route";
+import { authMiddleware } from "@/middlewares/auth.middleware";
 
 const app: Express = express();
+
 app.use(express.json());
 
+app.use("/auth", authRouter);
 app.use("/api/v1/users", userRouter);
-app.use("/api/v1/orders", orderRouter);
+app.use("/api/v1/orders", authMiddleware, orderRouter);
 
 app.get("/", (_, res) => {
   res.json({ message: "Hello World from Nerve trade platform's backend" });
@@ -30,7 +34,6 @@ app.use((err: HttpError, req: Request, res: Response, _next: NextFunction) => {
       body: { ...req.body, password: null },
     });
 
-    // Send response to client
     res.status(statusCode).json({
       error: [
         {

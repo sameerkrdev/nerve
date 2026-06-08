@@ -2,13 +2,14 @@ package internal
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	pbType "github.com/sameerkrdev/nerve/packages/proto-defs/go/generated/common"
@@ -27,9 +28,16 @@ type Event struct {
 	Data      []byte
 }
 
+type wsClaims struct {
+	Email string `json:"email"`
+	JTI   string `json:"jti"`
+	jwt.RegisteredClaims
+}
+
 type WSGateway struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx          context.Context
+	cancel       context.CancelFunc
+	jwtPublicKey *rsa.PublicKey
 
 	depthStreams   map[string]*redis.PubSub
 	depthStreamsMu sync.RWMutex
@@ -53,11 +61,12 @@ type WSGateway struct {
 	upgrader websocket.Upgrader
 }
 
-func NewWSGateway(redisClient *redis.Client) *WSGateway {
+func NewWSGateway(redisClient *redis.Client, jwtPublicKey *rsa.PublicKey) *WSGateway {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &WSGateway{
 		ctx:            ctx,
 		cancel:         cancel,
+		jwtPublicKey:   jwtPublicKey,
 		depthStreams:   make(map[string]*redis.PubSub),
 		depthUsers:     make(map[string]map[*User]bool),
 		tickerStreams:  make(map[string]*redis.PubSub),
@@ -77,18 +86,41 @@ func (wsg *WSGateway) Shutdown() {
 }
 
 func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	tokenStr := r.URL.Query().Get("token")
+	if tokenStr == "" {
+		http.Error(w, "missing token", http.StatusUnauthorized)
+		return
+	}
+
+	claims := &wsClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return wsg.jwtPublicKey, nil
+	}, jwt.WithLeeway(30*time.Second))
+	if err != nil || !token.Valid {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.JTI != "" {
+		n, err := wsg.redisClient.Exists(r.Context(), "bl:"+claims.JTI).Result()
+		if err == nil && n > 0 {
+			http.Error(w, "token revoked", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	userID := claims.Subject
+
 	conn, err := wsg.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		id = fmt.Sprintf("client-%d", time.Now().UnixNano())
-	}
-
 	user := &User{
-		ID:         id,
+		ID:         userID,
 		Conn:       conn,
 		send:       make(chan *Event, userChannelBuf),
 		depthSubs:  make(map[string]bool),
@@ -102,7 +134,6 @@ func (wsg *WSGateway) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go user.readPump(wsg)
 
 	wsg.startOrderStream(user)
-
 }
 
 func (wsg *WSGateway) registerUser(user *User) {

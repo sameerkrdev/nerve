@@ -22,7 +22,7 @@ export class OrderController {
 
   createOrder = (req: CreateOrderRequest, res: Response, next: NextFunction) => {
     const { symbol, price, quantity, side, type } = req.body;
-    const userId = "95655175-4c8b-4c10-8f6d-ba756f3608a9"; // TODO: replace with authenticated userId --> req.userId
+    const userId = req.user!.id;
 
     const grpcRequest: GrpcCreateOrderRequest = {
       symbol,
@@ -48,7 +48,7 @@ export class OrderController {
 
   cancelOrder = (req: CancelOrderRequest, res: Response, next: NextFunction) => {
     const id = req.params.id;
-    const userId = "95655175-4c8b-4c10-8f6d-ba756f3608a9"; // TODO: replace with authenticated userId --> req.userId
+    const userId = req.user!.id;
 
     const requestBody: GrpcCancelOrderRequest = {
       id: id,
@@ -71,7 +71,7 @@ export class OrderController {
 
   modifyOrder = (req: ModifyOrderRequest, res: Response, next: NextFunction) => {
     const orderId = req.params.id;
-    const userId = "95655175-4c8b-4c10-8f6d-ba756f3608a9"; // TODO: replace with authenticated userId --> req.userId
+    const userId = req.user!.id;
 
     const { symbol, newPrice, newQuantity } = req.body;
     const requestBody: GrpcModifyOrderRequest = {

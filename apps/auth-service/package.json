@@ -1,47 +1,40 @@
 {
-  "name": "@repo/api-gateway",
+  "name": "@repo/auth-service",
   "version": "1.0.0",
-  "description": "",
   "main": "src/server.ts",
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/src/index.js",
+    "start": "node dist/src/server.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier .",
     "check-types": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf dist"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@grpc/grpc-js": "^1.14.0",
-    "@grpc/proto-loader": "^0.8.0",
     "@repo/logger": "workspace:*",
     "@repo/prisma": "workspace:*",
     "@repo/proto-defs": "workspace:*",
+    "bcryptjs": "^2.4.3",
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",
-    "express": "^5.1.0",
-    "express-rate-limit": "^7.5.0",
     "http-errors": "^2.0.0",
     "ioredis": "^5.4.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
-    "@repo/types": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@repo/validator": "workspace:*",
-    "@types/express": "^5.0.3",
+    "@types/bcryptjs": "^2.4.6",
     "@types/http-errors": "^2.0.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.3",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }

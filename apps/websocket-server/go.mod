@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/redis/go-redis/v9 v9.20.0 // indirect
 	go.opentelemetry.io/otel v1.41.0 // indirect
