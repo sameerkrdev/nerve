@@ -1,15 +1,26 @@
-import { Kafka, type Producer, type Consumer } from "kafkajs";
+import { Kafka, type Producer, type Consumer, logLevel } from "kafkajs";
 import type { z } from "@repo/validator";
 import type { Logger } from "@repo/logger";
 import { logger } from "@repo/logger";
+import env from "./config/dotenv";
 
 class KafkaClient {
   private kafka: Kafka;
   private producer?: Producer;
   private log: Logger;
 
-  constructor(clientId: string, brokers: string[]) {
-    this.kafka = new Kafka({ clientId, brokers });
+  constructor(clientId: string) {
+    this.kafka = new Kafka({
+      clientId,
+      brokers: env.KAFKA_BROKERS.split(","),
+      ssl: { ca: [env.KAFKA_CA] },
+      sasl: {
+        mechanism: "plain",
+        username: env.KAFKA_USERNAME,
+        password: env.KAFKA_PASSWORD,
+      },
+      logLevel: logLevel.WARN,
+    });
     this.log = logger.child({ component: `KafkaClient:${clientId}` });
   }
 

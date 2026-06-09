@@ -1,0 +1,422 @@
+{
+  "info": {
+    "_postman_id": "nerve-exchange-api",
+    "name": "Nerve Exchange API",
+    "description": "Complete API collection for the Nerve trading platform.\n\n## Setup\n1. Set `baseUrl` variable to `http://localhost:8001`\n2. Run **Auth / Register** or **Auth / Login**\n3. The collection auto-saves `accessToken` and `refreshToken` from login/register responses via post-response scripts\n4. All protected routes read `{{accessToken}}` automatically\n\n## WebSocket\nConnect to `ws://localhost:50053/api/v1/ws?token={{accessToken}}` (token optional — omit for public streams only).\n\nSee `docs/REALTIME_EVENT_FLOW.md` for full WS message protocol.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8001",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Authentication routes — all proxied through api-gateway to auth-service (gRPC).\n\nRate limited: /register and /login allow 10 requests per 15 minutes per IP.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "  pm.collectionVariables.set('userId', res.user?.id || '');",
+                  "  console.log('Tokens saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"username\": \"alice\",\n  \"password\": \"supersecret123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Creates a new user account.\n\nReturns `accessToken` (RS256 JWT, 15 min), `refreshToken` (opaque UUID, 7 days), and `user` object.\n\nRate limited: 10 req / 15 min per IP."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "  pm.collectionVariables.set('userId', res.user?.id || '');",
+                  "  console.log('Tokens saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"supersecret123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticates a user. Returns `accessToken`, `refreshToken`, and `user`.\n\nAccess token expires in 15 minutes. Use **Refresh** to rotate it.\n\nRate limited: 10 req / 15 min per IP."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "  console.log('Tokens rotated');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Rotates the refresh token — old refresh token is invalidated immediately, new pair returned.\n\nReuse detection: presenting an already-consumed refresh token invalidates the entire token family and forces re-login."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Invalidates the session. Both tokens are revoked:\n- Refresh token deleted from Redis\n- Access token JTI added to Redis blacklist (`bl:{jti}`) with TTL = remaining token life\n\nReturns 204 No Content."
+          }
+        },
+        {
+          "name": "Me (Current User)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Returns the authenticated user's profile.\n\nRequires valid `Authorization: Bearer <accessToken>` header."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "description": "Order management — routed through api-gateway → order-service (gRPC) → matching-engine (gRPC).\n\nAll routes require authentication via `Authorization: Bearer <accessToken>`.",
+      "item": [
+        {
+          "name": "Place Order — Limit Buy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.orderId) {",
+                  "  pm.collectionVariables.set('orderId', res.orderId);",
+                  "  console.log('orderId saved:', res.orderId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"BTCUSD\",\n  \"side\": \"BUY\",\n  \"type\": \"LIMIT\",\n  \"price\": 89000,\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            },
+            "description": "Places a new order on the matching engine.\n\n**Fields:**\n- `symbol` — trading pair (string, e.g. `BTCUSD`)\n- `side` — `BUY` or `SELL`\n- `type` — `MARKET`, `LIMIT`, `STOP`, or `STOP_LIMIT`\n- `price` — integer (required for LIMIT, STOP, STOP_LIMIT; omit for MARKET)\n- `quantity` — positive integer\n\n**Real-time feedback:** Subscribe to order stream via WebSocket to receive `ORDER_ACCEPTED`, `TRADE_EXECUTED`, `ORDER_FILLED`, etc."
+          }
+        },
+        {
+          "name": "Place Order — Market Sell",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"BTCUSD\",\n  \"side\": \"SELL\",\n  \"type\": \"MARKET\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            },
+            "description": "Market order — no price required. Matches immediately against best available resting orders."
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"BTCUSD\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}"]
+            },
+            "description": "Cancels an open order by ID.\n\n- `id` — UUID in URL path (auto-filled from `orderId` collection variable)\n- `symbol` — must match the original order's symbol\n\nSubscribers receive `ORDER_CANCELLED` event on WS order stream."
+          }
+        },
+        {
+          "name": "Modify Order",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"BTCUSD\",\n  \"newPrice\": 89500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}"]
+            },
+            "description": "Modifies price and/or quantity of a resting order.\n\n- `symbol` — required\n- `newPrice` — optional positive integer\n- `newQuantity` — optional positive integer\n- At least one of `newPrice` or `newQuantity` must be provided.\n\nSubscribers receive `ORDER_REDUCED` event if quantity decreases."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "User management — direct Prisma operations via api-gateway. These routes do not enforce auth middleware (internal/admin use).\n\nBase path: `/api/v1/users`",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@example.com\",\n  \"username\": \"bob\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"bob_updated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft Delete User",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/soft/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "soft", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft Delete Multiple Users",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"<uuid1>\", \"<uuid2>\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/soft",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "soft"]
+            }
+          }
+        },
+        {
+          "name": "Hard Delete User",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/hard/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "hard", "{{userId}}"]
+            },
+            "description": "Permanently deletes user record. Irreversible."
+          }
+        },
+        {
+          "name": "Hard Delete Multiple Users",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"<uuid1>\", \"<uuid2>\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/hard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "hard"]
+            },
+            "description": "Permanently deletes multiple user records. Irreversible."
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket (Reference)",
+      "description": "WebSocket endpoint is not callable via HTTP — this folder documents the protocol.\n\n## Connect\n```\nws://localhost:50053/api/v1/ws\nws://localhost:50053/api/v1/ws?token=<accessToken>\n```\n\nToken is optional. Without token: depth, ticker, candle streams only. With valid token: order stream also available.\n\n## Subscribe / Unsubscribe Messages\n\nSend JSON text frames:\n\n```json\n{ \"action\": \"subscribe_depth\",    \"symbol\": \"BTCUSD\" }\n{ \"action\": \"unsubscribe_depth\",  \"symbol\": \"BTCUSD\" }\n{ \"action\": \"subscribe_ticker\",   \"symbol\": \"BTCUSD\" }\n{ \"action\": \"unsubscribe_ticker\", \"symbol\": \"BTCUSD\" }\n{ \"action\": \"subscribe_candles\",    \"symbol\": \"BTCUSD\", \"timeframe\": \"1M\" }\n{ \"action\": \"unsubscribe_candles\",  \"symbol\": \"BTCUSD\", \"timeframe\": \"1M\" }\n{ \"action\": \"subscribe_orders\" }    ← requires auth token\n{ \"action\": \"unsubscribe_orders\" }  ← requires auth token\n```\n\n## Timeframe values\n`1M`, `5M`, `15M`, `30M`, `1H`, `4H`, `1D`\n\n## Event shapes received\nSee `docs/REALTIME_EVENT_FLOW.md` for full JSON examples for each event type (DEPTH, TICKER, candle, ORDER_ACCEPTED, TRADE_EXECUTED, ORDER_FILLED, ORDER_REDUCED, ORDER_CANCELLED, ORDER_REJECTED).\n\n## Testing WS in Postman\n1. Open New → WebSocket Request\n2. URL: `ws://localhost:50053/api/v1/ws?token={{accessToken}}`\n3. Connect\n4. Send subscribe messages as text frames",
+      "item": [
+        {
+          "name": "WS Connection Info",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ws",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ws"]
+            },
+            "description": "This is NOT a real HTTP request — it documents the WS endpoint.\n\nActual WebSocket URL: `ws://localhost:50053/api/v1/ws?token=<accessToken>`\n\nNote: WS server runs on port 50053, not on the api-gateway port 8001. Connect directly."
+          }
+        }
+      ]
+    }
+  ]
+}

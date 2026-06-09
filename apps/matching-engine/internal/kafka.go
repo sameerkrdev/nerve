@@ -2,6 +2,9 @@ package internal
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -23,12 +26,51 @@ var (
 
 func GetProducer(brokers []string) (sarama.SyncProducer, error) {
 	once.Do(func() {
+		caCert := os.Getenv("KAFKA_CA")
+		if caCert == "" {
+			initErr = fmt.Errorf("KAFKA_CA is required in environment variables")
+			return
+		}
+
+		if os.Getenv("KAFKA_USERNAME") == "" || os.Getenv("KAFKA_PASSWORD") == "" {
+			initErr = fmt.Errorf("KAFKA_USERNAME and KAFKA_PASSWORD are required in environment variables")
+			return
+		}
+
+		caCertBytes := []byte(caCert)
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCertBytes)
+
+		tlsConfig := &tls.Config{
+			RootCAs: caCertPool,
+		}
+
 		config := sarama.NewConfig()
+
+		// init config, enable errors and notifications
+		config.Metadata.Full = true
+		config.ClientID = "matching-engine"
+		config.Producer.Return.Successes = true
+
+		// Kafka SASL configuration
+		config.Net.SASL.Enable = true
+		config.Net.SASL.User = os.Getenv("KAFKA_USERNAME")
+		config.Net.SASL.Password = os.Getenv("KAFKA_PASSWORD")
+		config.Net.SASL.Handshake = true
+		config.Net.SASL.Mechanism = sarama.SASLTypePlaintext
+
+		// TLS configuration
+		config.Net.TLS.Enable = true
+		config.Net.TLS.Config = tlsConfig
+
 		config.Producer.RequiredAcks = sarama.WaitForAll
 		config.Producer.Retry.Max = 5
 		config.Producer.Return.Successes = true
 		config.Producer.Idempotent = true
 		config.Net.MaxOpenRequests = 1
+		config.Producer.Flush.Frequency = 10 * time.Millisecond
+		config.Producer.Flush.Bytes = 1024 * 1024
+		config.Net.TLS.Config = tlsConfig
 
 		producer, initErr = sarama.NewSyncProducer(brokers, config)
 	})
@@ -50,7 +92,7 @@ type KafkaProducerWorker struct {
 func NewKafkaProducerWorker(symbol string, dirPath string, wal *SymbolWAL, batchSize int, emitTime int) (*KafkaProducerWorker, error) {
 	brokersEnv := os.Getenv("KAFKA_BROKERS")
 	if brokersEnv == "" {
-		brokersEnv = "localhost:19092,localhost:19093,localhost:19094"
+		return nil, fmt.Errorf("KAFKA_BROKERS is required in environment variables")
 	}
 	brokers := strings.Split(brokersEnv, ",")
 	producer, err := GetProducer(brokers)
@@ -128,7 +170,7 @@ func (kpw *KafkaProducerWorker) emitToKafka(events []*common.WAL_Entry) error {
 
 	for _, event := range events {
 		msg := &sarama.ProducerMessage{
-			Topic: "engine-events",
+			Topic: "matching-engine.events",
 			Key:   sarama.StringEncoder(kpw.Symbol),
 			Value: sarama.ByteEncoder(event.GetData()),
 			Headers: []sarama.RecordHeader{

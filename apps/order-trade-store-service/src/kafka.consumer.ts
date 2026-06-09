@@ -10,7 +10,6 @@ import { OrderServerController } from "@/controllers/order.controller";
 import type { OrderSide, OrderStatus, OrderType } from "@repo/prisma";
 import { TradeRepository } from "@repo/prisma";
 import { OrderRepository } from "@repo/prisma";
-import env from "@/config/dotenv";
 import {
   EngineEvent,
   OrderReducedEvent,
@@ -34,10 +33,7 @@ class KafkaConsumer {
   private tradeRepo: TradeRepository;
 
   constructor() {
-    this.kafkaClient = new KafkaClient(
-      KAFKA_CLIENT_ID.ORDER_CONSUMER_SERVICE,
-      env.KAFKA_BROKERS.split(","),
-    );
+    this.kafkaClient = new KafkaClient(KAFKA_CLIENT_ID.ORDER_CONSUMER_SERVICE);
     this.orderRepo = new OrderRepository();
     this.tradeRepo = new TradeRepository();
     this.orderController = new OrderServerController(this.logger, this.orderRepo);

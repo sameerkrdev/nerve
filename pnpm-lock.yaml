@@ -457,6 +457,12 @@ importers:
       "@repo/validator":
         specifier: workspace:*
         version: link:../validator
+      dotenv:
+        specifier: ^17.2.2
+        version: 17.2.2
+      envalid:
+        specifier: ^8.1.0
+        version: 8.1.0
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4

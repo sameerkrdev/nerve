@@ -51,6 +51,7 @@ func main() {
 	if err := redisClient.Ping(context.Background()).Err(); err != nil {
 		log.Fatalf("redis ping failed: %v", err)
 	}
+	slog.Info("redis connected")
 
 	jwtPublicKeyB64 := os.Getenv("JWT_PUBLIC_KEY")
 	if jwtPublicKeyB64 == "" {

@@ -35,7 +35,12 @@ func main() {
 		chConn = nil
 	}
 
-	brokerAddresses := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+	brokersEnv := os.Getenv("KAFKA_BROKERS")
+	if brokersEnv == "" {
+		slog.Error("KAFKA_BROKERS is required in environment variables")
+		os.Exit(1)
+	}
+	brokerAddresses := strings.Split(brokersEnv, ",")
 
 	if err := kafka.InitKafkaProducer(brokerAddresses); err != nil {
 		slog.Error("kafka producer init failed", "error", err)
@@ -59,7 +64,7 @@ func main() {
 
 	kafkaConsumerHandler := kafka.NewConsumerHandler(workerRouter)
 
-	topics := []string{"trades"}
+	topics := []string{"matching-engine.events"}
 
 	go kafkaConsumerClient.Consume(ctx, topics, kafkaConsumerHandler)
 

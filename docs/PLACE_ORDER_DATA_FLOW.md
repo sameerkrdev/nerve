@@ -215,6 +215,54 @@ Consumes from Kafka topic `engine-events`, decodes `EngineEvent` protobuf, and h
 
 ---
 
+### Step 8 — Real-Time Delivery to Connected Clients (Redis pub/sub → WebSocket)
+
+**Service**: `websocket-server` (Go)
+**File**: `apps/websocket-server/internal/`
+
+The matching engine calls `PublishEngineEvent()` synchronously for each event **before** returning the gRPC response. This means real-time delivery happens at `t≈5ms`, before the HTTP response even reaches the client.
+
+#### Order events (authenticated users only)
+
+```
+Matching Engine
+  PublishEngineEvent(TRADE_EXECUTED)
+    → redis.Publish("order:alice-id", engineEventBytes)   // buyer
+    → redis.Publish("order:bob-id",   engineEventBytes)   // seller
+```
+
+websocket-server maintains one `redis.PubSub` per connected authenticated user on channel `order:{userID}`. The `receiveOrderEvents` goroutine reads from the channel, deserializes `EngineEvent` proto, and emits to the user's buffered send channel → `writePump` → WebSocket frame.
+
+Received by client:
+
+```json
+{ "eventType": "TRADE_EXECUTED", "data": { "tradeId": "...", "price": "89950", "quantity": "5", ... } }
+{ "eventType": "ORDER_FILLED",   "data": { "orderId": "...", "avgPrice": "89925", ... } }
+```
+
+#### Depth / Ticker (public, fan-out)
+
+```
+Matching Engine
+  PublishEngineEvent(DEPTH)   → redis.Publish("depth:BTCUSD", depthBytes)
+  PublishEngineEvent(TICKER)  → redis.Publish("ticker:BTCUSD", tickerBytes)
+```
+
+One `redis.PubSub` per symbol shared across all subscribers (`fanoutStream`). Event is emitted to every user who sent `subscribe_depth BTCUSD`. No per-user Redis subscription.
+
+#### Candle updates (public, fan-out, ~2s latency)
+
+```
+Candle Service (after Kafka consumption + OHLCV update)
+  → redis.Publish("candles:BTCUSD:1M", candleProtoBytes)
+```
+
+websocket-server's candle `fanoutStream` deserializes the proto, JSON-marshals once into `CandleWSPayload`, and emits the same bytes to all `candles:BTCUSD:1M` subscribers.
+
+> Full WebSocket message protocol and auth details: see `docs/REALTIME_EVENT_FLOW.md`
+
+---
+
 ## Complete Timeline for a Single Place Order
 
 ```
@@ -263,6 +311,20 @@ t=2100ms  Order-Trade-Store Service:                        Candle Service:
             └── ORDER_FILLED  → UPDATE incoming order               ├── Redis L2 cache
                                                                     ├── In-memory L1 cache
                                                                     └── Kafka "candles" topic
+
+
+                    REAL-TIME DELIVERY PATH (Redis pub/sub → WebSocket)
+                    ─────────────────────────────────────────────────────
+                         ┌─────────────────────────────────────────────────────────────────┐
+                         │  Matching Engine → Redis pub/sub                                │
+                         │    order:{alice}  ──→  websocket-server  ──→  Alice's browser  │
+                         │    order:{bob}    ──→  websocket-server  ──→  Bob's browser    │
+                         │    depth:BTCUSD   ──→  websocket-server  ──→  all depth subs   │
+                         │    ticker:BTCUSD  ──→  websocket-server  ──→  all ticker subs  │
+                         │                                                                 │
+                         │  Candle Service → Redis pub/sub (~2s later)                    │
+                         │    candles:BTCUSD:1M  ──→  websocket-server  ──→  candle subs  │
+                         └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -276,6 +338,7 @@ t=2100ms  Order-Trade-Store Service:                        Candle Service:
 | **Matching Engine**   | Go         | gRPC server                  | Core. Matches orders, generates trades, writes WAL, pushes gRPC streams      |
 | **Order-Trade-Store** | TypeScript | Kafka consumer               | Persists orders and trades to PostgreSQL (Prisma)                            |
 | **Candle Service**    | Go         | Kafka consumer + gRPC server | Computes OHLCV candles, stores in memory/Redis, publishes to Kafka           |
+| **WebSocket Server**  | Go         | WebSocket + Redis subscriber | Fans out Redis pub/sub events to connected browser clients in real time      |
 
 ---
 

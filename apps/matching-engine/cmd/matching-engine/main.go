@@ -17,11 +17,12 @@ import (
 func main() {
 	godotenv.Load()
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
 		if err := internal.InitRedis(redisURL); err != nil {
 			slog.Warn("redis init failed — order/depth events will not be published", "err", err)
-		} else {
-			slog.Info("redis connected")
 		}
 	} else {
 		slog.Warn("REDIS_URL not set — order/depth events will not be published")
@@ -31,9 +32,6 @@ func main() {
 	if port == "" {
 		log.Fatalf("Failed to serve: %v", "PORT is required")
 	}
-
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
 
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {

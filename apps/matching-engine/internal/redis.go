@@ -23,6 +23,7 @@ func InitRedis(url string) error {
 		return err
 	}
 	redisClient = c
+	slog.Info("redis connected", "addr", opt.Addr)
 	return nil
 }
 

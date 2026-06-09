@@ -68,22 +68,25 @@ Started: 2026-06-02
 - ✅ Order/trade stream — per-user Redis sub (`order:{userID}`) started on connect, stopped on disconnect
 - ✅ Auto-reconnect on Redis drop (only if users still subscribed / connected)
 - ✅ Pre-encode JSON once at fan-out time (zero per-user marshal work)
-- ✅ Full refactor into 6 files: gateway, user, depth_stream, candle_stream, order_stream, candle (keys)
+- ✅ Refactored: `fanoutStream` generic struct in `stream.go` replaces duplicate depth/ticker/candle stream files — one Redis sub per key, fan-out to N users, auto-reconnect
 - ✅ Non-blocking `writePump` via buffered per-user channel (1024 cap, drop with warn on full)
 - ❌ No indicator stream (indicator-service not built yet)
-- ❌ gRPC engine connection removed — order/depth events now via Redis (see matching-engine below)
+- ✅ gRPC engine connection removed — order/depth events now via Redis (see matching-engine below)
 
 ---
 
 ## Phase 3 — User Auth & Ledger (Days 5–6)
 
-### 5. User Auth — in-memory + Prisma DB ⬜
+### 5. User Auth ✅
 
-- JWT-based auth (access + refresh)
-- In-memory session cache (map[userID]session)
-- Prisma DB for persistence (users table)
-- Register / Login / Refresh / Logout routes
-- Middleware for order-service, api-gateway
+- ✅ RS256 asymmetric JWT — private key in auth-service only, public key distributed to api-gateway + websocket-server for local verification (no auth-service call on hot path)
+- ✅ Access token (15 min) + refresh token (7 days) with rotation and family-based theft detection
+- ✅ Redis blacklist: `bl:{jti}` TTL = remaining token life — immediate logout invalidation
+- ✅ auth-service — gRPC server (port 50054), Prisma users table, bcrypt cost 12
+- ✅ auth-service gRPC methods: Register, Login, Refresh, Logout, Me
+- ✅ api-gateway — `/auth/*` routes proxy to auth-service via gRPC client; `authMiddleware` verifies RS256 + blacklist check
+- ✅ websocket-server — optional `?token=` query param; public streams (depth/ticker/candle) allow anon; order stream requires valid JWT
+- ✅ `authRequiredActions` map in websocket-server — single place to define which WS actions need auth
 
 ### 6. ledger-service ⬜
 
@@ -168,19 +171,3 @@ Started: 2026-06-02
 | web                       | TS/React | ⬜ scaffold  | WS + HTTP                                      |
 
 ---
-
-## Daily Log
-
-| Day | Date       | Done                                                                                                                                                                  |
-| --- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 2026-06-02 | Audit & roadmap created. candle-service L1/L2/pub-sub mostly wired. Identified bugs.                                                                                  |
-| 2   | 2026-06-03 | Phase 1 complete. candle-service L1→L2→L3 fallthrough + CH insert. trade-ingestor TradeBatcher with size+time flush.                                                  |
-| 3   | 2026-06-06 | Phase 2 complete. WS server candle stream. Full refactor into 6 files. CH materialized views + EnsureSchema for cloud. proto.Marshal fix for Redis publish.           |
-| 4   | 2026-06-07 | matching-engine fan-out refactor. streamSender non-blocking broadcast. Redis pub/sub for depth/ticker/order events. WS server drops gRPC — pure Redis event delivery. |
-| 5   |            |                                                                                                                                                                       |
-| 6   |            |                                                                                                                                                                       |
-| 6   |            |                                                                                                                                                                       |
-| 7   |            |                                                                                                                                                                       |
-| 8   |            |                                                                                                                                                                       |
-| 9   |            |                                                                                                                                                                       |
-| 10  |            |                                                                                                                                                                       |

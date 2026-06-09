@@ -35,7 +35,7 @@ export class AuthGrpcServer {
   async shutdown(): Promise<void> {
     return new Promise((resolve) => {
       this.server.tryShutdown(() => {
-        this.logger.info("auth gRPC server shut down");
+        this.logger.info("auth gRPC server shutdown");
         resolve();
       });
     });

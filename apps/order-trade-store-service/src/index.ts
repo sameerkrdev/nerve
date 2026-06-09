@@ -1,5 +1,6 @@
 import { logger } from "@repo/logger";
 import KafkaConsumer from "@/kafka.consumer";
+import "./config/dotenv";
 
 const kafkaConsumerInstance = new KafkaConsumer();
 kafkaConsumerInstance.startConsuming();
@@ -7,6 +8,7 @@ kafkaConsumerInstance.startConsuming();
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Received SIGINT, shutting down gracefully");
+
   await kafkaConsumerInstance.shutdown();
   process.exit(0);
 });

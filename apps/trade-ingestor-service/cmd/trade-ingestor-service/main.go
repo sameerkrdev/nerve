@@ -33,7 +33,8 @@ func main() {
 
 	brokersEnv := os.Getenv("KAFKA_BROKERS")
 	if brokersEnv == "" {
-		brokersEnv = "localhost:19092,localhost:19093,localhost:19094"
+		slog.Error("KAFKA_BROKERS is required in environment variables")
+		os.Exit(1)
 	}
 	brokerAddresses := strings.Split(brokersEnv, ",")
 
@@ -48,7 +49,7 @@ func main() {
 
 	consumerHandler := kafka.NewConsumerHandler(batcher)
 
-	topics := []string{"trades"}
+	topics := []string{"matching-engine.events"}
 
 	go kafka.Consume(ctx, topics, consumerHandler)
 

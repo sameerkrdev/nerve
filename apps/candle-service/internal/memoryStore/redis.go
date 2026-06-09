@@ -41,7 +41,7 @@ func InitRedis() error {
 			return
 		}
 
-		fmt.Println("Redis connected")
+		slog.Info("redis connected", "addr", opt.Addr)
 
 		RedisClient = client
 	})

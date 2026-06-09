@@ -28,6 +28,8 @@
   },
   "dependencies": {
     "kafkajs": "^2.2.4",
+    "dotenv": "^17.2.2",
+    "envalid": "^8.1.0",
     "@repo/validator": "workspace:*",
     "@repo/logger": "workspace:*"
   }

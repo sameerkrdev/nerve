@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TOPICS=("engine-events" "trades" "payments" "users")
+TOPICS=("matching-engine.events" "candle-service.candles" "payments" "users")
 BOOTSTRAP_SERVERS="kafka-1:9092"
 PARTITIONS=12
 REPLICATION_FACTOR=3
